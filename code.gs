@@ -86,6 +86,7 @@ function doPost(e) {
       case 'saveMasterKeywords': result = saveMasterKeywords(data.produkId, data.keywords); break;
       case 'generateKeywords': result = generateKeywordsFromMaster(data.produkId, data.count); break;
       case 'refreshAllKeywords': result = refreshAllKeywords(); break;
+      case 'uploadImage': result = uploadImage(data.name, data.type, data.base64, data.folderId); break;
       default: result = { success: false, error: 'Aksi tidak dikenali: ' + action }; break;
     }
   } catch(err) {
@@ -1519,11 +1520,66 @@ function parseLinks(raw) {
 
 function getImageUrlFromLink(url) {
   if (!url) return null;
+  url = String(url).trim();
+  if (url.includes('googleusercontent.com') || url.includes('blogger.com') || url.includes('bp.blogspot.com') || url.includes('cloudinary.com') || url.includes('imgbb.com') || url.includes('imgur.com')) {
+    return url;
+  }
   if (url.includes('drive.google.com')) {
     const match = url.match(/[-\w]{25,}/);
-    return match ? `https://drive.google.com/thumbnail?id=${match[0]}&sz=w1200` : null;
+    return match ? `https://lh3.googleusercontent.com/d/${match[0]}=s1200` : url;
   }
   return url;
+}
+
+function uploadImage(name, type, base64Data, folderId) {
+  const config = getConfig();
+  let folder;
+  const targetFolderId = folderId || config.DRIVE_FOLDER_ID;
+  
+  if (targetFolderId) {
+    try {
+      folder = DriveApp.getFolderById(targetFolderId);
+    } catch(e) {
+      console.warn("Folder ID tidak valid, mencari atau membuat folder AutoPosting_Uploads: " + e);
+    }
+  }
+  
+  if (!folder) {
+    const folders = DriveApp.getFoldersByName("AutoPosting_Uploads");
+    if (folders.hasNext()) {
+      folder = folders.next();
+    } else {
+      folder = DriveApp.createFolder("AutoPosting_Uploads");
+    }
+  }
+  
+  // Set sharing folder ke publik agar gambar selalu bisa diakses publik
+  try {
+    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch(e) {}
+  
+  const cleanBase64 = String(base64Data || '').replace(/^data:image\/[a-zA-Z0-9+]+;base64,/, '');
+  const decoded = Utilities.base64Decode(cleanBase64);
+  const fileName = name || ('img_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '.jpg');
+  const blob = Utilities.newBlob(decoded, type || 'image/jpeg', fileName);
+  
+  const file = folder.createFile(blob);
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch(e) {}
+  
+  const fileId = file.getId();
+  // Google UserContent CDN link langsung (resmi, cepat, tanpa batasan viewer)
+  const directUrl = `https://lh3.googleusercontent.com/d/${fileId}=s1200`;
+  const viewUrl = file.getUrl();
+  
+  return {
+    success: true,
+    fileId: fileId,
+    url: directUrl,
+    viewUrl: viewUrl,
+    name: fileName
+  };
 }
 
 function authorizeBlogger() {

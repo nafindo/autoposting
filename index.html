@@ -90,6 +90,19 @@
     .tag-badge .remove-tag:hover{opacity:1}
     .existing-label-pill{cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#e8f0fe;color:#1a73e8;padding:3px 8px;border-radius:15px;font-size:12px;border:1px solid #d2e3fc;transition:all .2s ease;user-select:none}
     .existing-label-pill:hover{background:#d2e3fc;transform:translateY(-1px)}
+    .upload-preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(85px,1fr));gap:10px;min-height:40px;padding:8px;background:var(--bg);border:1px dashed var(--border);border-radius:8px;margin-top:6px}
+    .upload-card{position:relative;width:100%;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:#fff;box-shadow:0 2px 5px rgba(0,0,0,0.05)}
+    .upload-card img{width:100%;height:100%;object-fit:cover;display:block}
+    .upload-card .btn-remove-img{position:absolute;top:4px;right:4px;width:22px;height:22px;background:rgba(234,67,53,0.9);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;border:none;font-weight:700;transition:transform .2s;line-height:1}
+    .upload-card .btn-remove-img:hover{transform:scale(1.15)}
+    .upload-card.uploading{display:flex;align-items:center;justify-content:center;background:#f8f9fa}
+    .varian-list-container{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+    .varian-row-item{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);padding:8px;border-radius:8px}
+    .varian-thumb-box{width:60px;height:60px;border-radius:6px;border:1px dashed var(--border);background:#fff;position:relative;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;text-align:center}
+    .varian-thumb-box img{width:100%;height:100%;object-fit:cover;display:block}
+    .varian-thumb-box .upload-prompt{font-size:10px;color:var(--text-sec);line-height:1.2}
+    .btn-toggle-link{background:none;border:none;color:var(--text-sec);font-size:11px;cursor:pointer;padding:2px 0;margin-top:4px;text-decoration:underline;display:inline-block}
+    .btn-toggle-link:hover{color:var(--primary)}
     @media(max-width:768px){.sidebar{width:100%;position:relative;height:auto}.main{margin-left:0}.form-row{grid-template-columns:1fr}}
   </style>
 </head>
@@ -473,16 +486,39 @@
         <!-- Tab 2: Gambar & Varian Produk -->
         <div id="modalProduk-tab-images" class="modal-tab-content" style="display:none">
           <div class="form-group">
-            <label>🖼️ Hero Images <small style="font-weight:400;color:#888">(1 link gambar/Google Drive per baris)</small></label>
-            <textarea class="form-control" id="newProdukHero" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://example.com/hero.jpg"></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="margin:0;">🖼️ Hero Images (Foto Utama)</label>
+              <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;display:inline-flex;align-items:center;gap:6px;">
+                <i class="fas fa-cloud-upload-alt"></i> Upload Foto (Galeri/PC)
+                <input type="file" multiple accept="image/*" style="display:none" onchange="handleImageUpload(this, 'newProdukHeroGrid', 'newProdukHero')">
+              </label>
+            </div>
+            <div id="newProdukHeroGrid" class="upload-preview-grid"></div>
+            <textarea class="form-control" id="newProdukHero" rows="2" style="font-size:12px;margin-top:6px;display:none;" placeholder="Link foto hero (otomatis terisi saat upload)" oninput="syncTextareaToGrid('newProdukHero', 'newProdukHeroGrid')"></textarea>
+            <button type="button" class="btn-toggle-link" onclick="toggleLinkTextarea('newProdukHero')"><i class="fas fa-link"></i> <span id="newProdukHero-btn-label">Tampilkan Link Manual</span></button>
           </div>
-          <div class="form-group">
-            <label>🎨 Varian Produk <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Nama Varian</code> per baris)</small></label>
-            <textarea class="form-control" id="newProdukVarian" rows="4" placeholder="https://drive.google.com/file/d/.../view | Teak Wood 01&#10;https://drive.google.com/file/d/.../view | Oak Natural 02"></textarea>
+
+          <div class="form-group" style="margin-top:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="margin:0;">🎨 Varian Produk (Warna / Tipe / Motif)</label>
+              <button type="button" class="btn btn-outline btn-sm" onclick="addVarianRow('newProdukVarianList', 'newProdukVarian')"><i class="fas fa-plus"></i> Tambah Varian</button>
+            </div>
+            <div id="newProdukVarianList" class="varian-list-container"></div>
+            <textarea class="form-control" id="newProdukVarian" rows="2" style="font-size:12px;margin-top:6px;display:none;" placeholder="Format: URL | Keterangan" oninput="syncTextareaToVarianList('newProdukVarian', 'newProdukVarianList')"></textarea>
+            <button type="button" class="btn-toggle-link" onclick="toggleLinkTextarea('newProdukVarian')"><i class="fas fa-link"></i> <span id="newProdukVarian-btn-label">Tampilkan Link Manual</span></button>
           </div>
-          <div class="form-group">
-            <label>🖼️ Gallery Produk <small style="font-weight:400;color:#888">(1 link gambar per baris)</small></label>
-            <textarea class="form-control" id="newProdukGallery" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://drive.google.com/file/d/.../view"></textarea>
+
+          <div class="form-group" style="margin-top:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="margin:0;">🖼️ Gallery Produk (Sample & Project)</label>
+              <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;display:inline-flex;align-items:center;gap:6px;">
+                <i class="fas fa-cloud-upload-alt"></i> Upload Galeri (Bisa Banyak)
+                <input type="file" multiple accept="image/*" style="display:none" onchange="handleImageUpload(this, 'newProdukGalleryGrid', 'newProdukGallery')">
+              </label>
+            </div>
+            <div id="newProdukGalleryGrid" class="upload-preview-grid"></div>
+            <textarea class="form-control" id="newProdukGallery" rows="2" style="font-size:12px;margin-top:6px;display:none;" placeholder="Link foto gallery (otomatis terisi saat upload)" oninput="syncTextareaToGrid('newProdukGallery', 'newProdukGalleryGrid')"></textarea>
+            <button type="button" class="btn-toggle-link" onclick="toggleLinkTextarea('newProdukGallery')"><i class="fas fa-link"></i> <span id="newProdukGallery-btn-label">Tampilkan Link Manual</span></button>
           </div>
         </div>
 
@@ -555,16 +591,39 @@
         <!-- Tab 2: Gambar & Varian Produk -->
         <div id="modalEditProduk-tab-images" class="modal-tab-content" style="display:none">
           <div class="form-group">
-            <label>🖼️ Hero Images <small style="font-weight:400;color:#888">(1 per baris)</small></label>
-            <textarea class="form-control" id="editProdukHero" rows="3"></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="margin:0;">🖼️ Hero Images (Foto Utama)</label>
+              <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;display:inline-flex;align-items:center;gap:6px;">
+                <i class="fas fa-cloud-upload-alt"></i> Upload Foto (Galeri/PC)
+                <input type="file" multiple accept="image/*" style="display:none" onchange="handleImageUpload(this, 'editProdukHeroGrid', 'editProdukHero')">
+              </label>
+            </div>
+            <div id="editProdukHeroGrid" class="upload-preview-grid"></div>
+            <textarea class="form-control" id="editProdukHero" rows="2" style="font-size:12px;margin-top:6px;display:none;" placeholder="Link foto hero" oninput="syncTextareaToGrid('editProdukHero', 'editProdukHeroGrid')"></textarea>
+            <button type="button" class="btn-toggle-link" onclick="toggleLinkTextarea('editProdukHero')"><i class="fas fa-link"></i> <span id="editProdukHero-btn-label">Tampilkan Link Manual</span></button>
           </div>
-          <div class="form-group">
-            <label>🎨 Varian Produk <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Nama Varian</code>)</small></label>
-            <textarea class="form-control" id="editProdukVarian" rows="4"></textarea>
+
+          <div class="form-group" style="margin-top:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="margin:0;">🎨 Varian Produk (Warna / Tipe / Motif)</label>
+              <button type="button" class="btn btn-outline btn-sm" onclick="addVarianRow('editProdukVarianList', 'editProdukVarian')"><i class="fas fa-plus"></i> Tambah Varian</button>
+            </div>
+            <div id="editProdukVarianList" class="varian-list-container"></div>
+            <textarea class="form-control" id="editProdukVarian" rows="2" style="font-size:12px;margin-top:6px;display:none;" placeholder="Format: URL | Keterangan" oninput="syncTextareaToVarianList('editProdukVarian', 'editProdukVarianList')"></textarea>
+            <button type="button" class="btn-toggle-link" onclick="toggleLinkTextarea('editProdukVarian')"><i class="fas fa-link"></i> <span id="editProdukVarian-btn-label">Tampilkan Link Manual</span></button>
           </div>
-          <div class="form-group">
-            <label>🖼️ Gallery Produk <small style="font-weight:400;color:#888">(1 per baris)</small></label>
-            <textarea class="form-control" id="editProdukGallery" rows="3"></textarea>
+
+          <div class="form-group" style="margin-top:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="margin:0;">🖼️ Gallery Produk (Sample & Project)</label>
+              <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;display:inline-flex;align-items:center;gap:6px;">
+                <i class="fas fa-cloud-upload-alt"></i> Upload Galeri (Bisa Banyak)
+                <input type="file" multiple accept="image/*" style="display:none" onchange="handleImageUpload(this, 'editProdukGalleryGrid', 'editProdukGallery')">
+              </label>
+            </div>
+            <div id="editProdukGalleryGrid" class="upload-preview-grid"></div>
+            <textarea class="form-control" id="editProdukGallery" rows="2" style="font-size:12px;margin-top:6px;display:none;" placeholder="Link foto gallery" oninput="syncTextareaToGrid('editProdukGallery', 'editProdukGalleryGrid')"></textarea>
+            <button type="button" class="btn-toggle-link" onclick="toggleLinkTextarea('editProdukGallery')"><i class="fas fa-link"></i> <span id="editProdukGallery-btn-label">Tampilkan Link Manual</span></button>
           </div>
         </div>
 
@@ -596,18 +655,42 @@
           <div style="font-weight:700;font-size:16px;color:var(--primary)" id="editGambarSpecProdukNama">-</div>
         </div>
         <div class="form-group">
-          <label>🖼️ Hero Images <small style="font-weight:400;color:#888">(1 link gambar/Google Drive per baris)</small></label>
-          <textarea class="form-control" id="editHeroImages" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://example.com/hero.jpg"></textarea>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label style="margin:0;">🖼️ Hero Images (Foto Utama)</label>
+            <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;display:inline-flex;align-items:center;gap:6px;">
+              <i class="fas fa-cloud-upload-alt"></i> Upload Foto (Galeri/PC)
+              <input type="file" multiple accept="image/*" style="display:none" onchange="handleImageUpload(this, 'editHeroImagesGrid', 'editHeroImages')">
+            </label>
+          </div>
+          <div id="editHeroImagesGrid" class="upload-preview-grid"></div>
+          <textarea class="form-control" id="editHeroImages" rows="2" style="font-size:12px;margin-top:6px;display:none;" placeholder="Link foto hero" oninput="syncTextareaToGrid('editHeroImages', 'editHeroImagesGrid')"></textarea>
+          <button type="button" class="btn-toggle-link" onclick="toggleLinkTextarea('editHeroImages')"><i class="fas fa-link"></i> <span id="editHeroImages-btn-label">Tampilkan Link Manual</span></button>
         </div>
-        <div class="form-group">
-          <label>🎨 Varian Produk <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Nama Varian</code> per baris)</small></label>
-          <textarea class="form-control" id="editVarian" rows="4" placeholder="https://drive.google.com/file/d/.../view | Teak Wood 01&#10;https://drive.google.com/file/d/.../view | Oak Natural 02"></textarea>
+
+        <div class="form-group" style="margin-top:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label style="margin:0;">🎨 Varian Produk (Warna / Tipe / Motif)</label>
+            <button type="button" class="btn btn-outline btn-sm" onclick="addVarianRow('editVarianList', 'editVarian')"><i class="fas fa-plus"></i> Tambah Varian</button>
+          </div>
+          <div id="editVarianList" class="varian-list-container"></div>
+          <textarea class="form-control" id="editVarian" rows="2" style="font-size:12px;margin-top:6px;display:none;" placeholder="Format: URL | Keterangan" oninput="syncTextareaToVarianList('editVarian', 'editVarianList')"></textarea>
+          <button type="button" class="btn-toggle-link" onclick="toggleLinkTextarea('editVarian')"><i class="fas fa-link"></i> <span id="editVarian-btn-label">Tampilkan Link Manual</span></button>
         </div>
-        <div class="form-group">
-          <label>🖼️ Gallery Produk <small style="font-weight:400;color:#888">(1 link gambar per baris)</small></label>
-          <textarea class="form-control" id="editGallery" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://drive.google.com/file/d/.../view"></textarea>
+
+        <div class="form-group" style="margin-top:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label style="margin:0;">🖼️ Gallery Produk (Sample & Project)</label>
+            <label class="btn btn-outline btn-sm" style="cursor:pointer;margin:0;display:inline-flex;align-items:center;gap:6px;">
+              <i class="fas fa-cloud-upload-alt"></i> Upload Galeri (Bisa Banyak)
+              <input type="file" multiple accept="image/*" style="display:none" onchange="handleImageUpload(this, 'editGalleryGrid', 'editGallery')">
+            </label>
+          </div>
+          <div id="editGalleryGrid" class="upload-preview-grid"></div>
+          <textarea class="form-control" id="editGallery" rows="2" style="font-size:12px;margin-top:6px;display:none;" placeholder="Link foto gallery" oninput="syncTextareaToGrid('editGallery', 'editGalleryGrid')"></textarea>
+          <button type="button" class="btn-toggle-link" onclick="toggleLinkTextarea('editGallery')"><i class="fas fa-link"></i> <span id="editGallery-btn-label">Tampilkan Link Manual</span></button>
         </div>
-        <div class="form-group">
+
+        <div class="form-group" style="margin-top:16px;">
           <label>📋 Spesifikasi Produk <small style="font-weight:400;color:#888">(Ukuran, ketebalan, wear layer, isi/box, dll.)</small></label>
           <textarea class="form-control" id="editSpecs" rows="6" placeholder="Ukuran: ...&#10;Ketebalan: ..."></textarea>
         </div>
@@ -960,6 +1043,212 @@
       arr.forEach(t => addTag(containerId, t));
     }
 
+    // ==================== IMAGE UPLOAD & PREVIEWS ====================
+    async function uploadFileToDrive(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          try {
+            const base64 = e.target.result;
+            const res = await apiPost('uploadImage', {
+              name: file.name,
+              type: file.type,
+              base64: base64
+            });
+            if (res && res.success) {
+              resolve(res.url);
+            } else {
+              reject(new Error(res.error || 'Upload gagal'));
+            }
+          } catch(err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(new Error('Gagal membaca file'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function handleImageUpload(inputEl, gridId, textareaId) {
+      const files = Array.from(inputEl.files || []);
+      if (files.length === 0) return;
+      
+      const grid = document.getElementById(gridId);
+      if (!grid) return;
+      
+      const emptyMsg = grid.querySelector('.empty-grid-msg');
+      if (emptyMsg) emptyMsg.remove();
+      
+      showToast(`Mengupload ${files.length} foto ke Google Drive...`, 'info');
+      
+      for (const file of files) {
+        const card = document.createElement('div');
+        card.className = 'upload-card uploading';
+        card.innerHTML = `<div class="loading" style="width:20px;height:20px;"></div>`;
+        grid.appendChild(card);
+        
+        try {
+          const url = await uploadFileToDrive(file);
+          card.classList.remove('uploading');
+          card.dataset.url = url;
+          card.innerHTML = `
+            <img src="${url}" alt="photo">
+            <button type="button" class="btn-remove-img" onclick="removeImageCard(this, '${gridId}', '${textareaId}')">&times;</button>
+          `;
+          syncGridToTextarea(gridId, textareaId);
+          showToast(`${file.name} berhasil diupload!`, 'success');
+        } catch(e) {
+          card.remove();
+          showToast(`Gagal upload ${file.name}: ${e.message}`, 'error');
+        }
+      }
+      
+      inputEl.value = '';
+    }
+
+    function removeImageCard(btn, gridId, textareaId) {
+      const card = btn.closest('.upload-card');
+      if (card) {
+        card.remove();
+        syncGridToTextarea(gridId, textareaId);
+        const grid = document.getElementById(gridId);
+        if (grid && grid.querySelectorAll('.upload-card').length === 0) {
+          grid.innerHTML = '<div class="empty-grid-msg" style="font-size:12px;color:#999;grid-column:1/-1;text-align:center;padding:10px;">Belum ada foto. Klik tombol "Upload Foto" di atas.</div>';
+        }
+      }
+    }
+
+    function syncGridToTextarea(gridId, textareaId) {
+      const grid = document.getElementById(gridId);
+      const textarea = document.getElementById(textareaId);
+      if (!grid || !textarea) return;
+      const urls = [];
+      grid.querySelectorAll('.upload-card').forEach(c => {
+        if (c.dataset.url) urls.push(c.dataset.url);
+      });
+      textarea.value = urls.join('\n');
+    }
+
+    function syncTextareaToGrid(textareaId, gridId) {
+      const textarea = document.getElementById(textareaId);
+      const grid = document.getElementById(gridId);
+      if (!textarea || !grid) return;
+      grid.innerHTML = '';
+      const urls = parseImageUrls(textarea.value);
+      if (urls.length === 0) {
+        grid.innerHTML = '<div class="empty-grid-msg" style="font-size:12px;color:#999;grid-column:1/-1;text-align:center;padding:10px;">Belum ada foto. Klik tombol "Upload Foto" di atas.</div>';
+        return;
+      }
+      urls.forEach(url => {
+        const thumb = formatDriveThumbnail(url) || url;
+        const card = document.createElement('div');
+        card.className = 'upload-card';
+        card.dataset.url = url;
+        card.innerHTML = `
+          <img src="${thumb}" alt="photo">
+          <button type="button" class="btn-remove-img" onclick="removeImageCard(this, '${gridId}', '${textareaId}')">&times;</button>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function toggleLinkTextarea(textareaId) {
+      const textarea = document.getElementById(textareaId);
+      const btnLabel = document.getElementById(textareaId + '-btn-label');
+      if (!textarea) return;
+      if (textarea.style.display === 'none' || textarea.style.display === '') {
+        textarea.style.display = 'block';
+        if (btnLabel) btnLabel.textContent = 'Sembunyikan Link Manual';
+      } else {
+        textarea.style.display = 'none';
+        if (btnLabel) btnLabel.textContent = 'Tampilkan Link Manual';
+      }
+    }
+
+    function addVarianRow(containerId, textareaId, initialUrl = '', initialKet = '') {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      const empty = container.querySelector('.empty-varian-msg');
+      if (empty) empty.remove();
+      
+      const row = document.createElement('div');
+      row.className = 'varian-row-item';
+      row.dataset.url = initialUrl;
+      
+      const thumbSrc = initialUrl ? (formatDriveThumbnail(initialUrl) || initialUrl) : '';
+      
+      row.innerHTML = `
+        <div class="varian-thumb-box" onclick="this.querySelector('input[type=file]').click()" title="Klik untuk upload foto varian">
+          ${thumbSrc ? `<img src="${thumbSrc}">` : `<div class="upload-prompt"><i class="fas fa-camera"></i><br>Foto</div>`}
+          <input type="file" accept="image/*" style="display:none" onchange="handleVarianUpload(this, '${containerId}', '${textareaId}')">
+        </div>
+        <div style="flex:1;">
+          <input type="text" class="form-control form-control-sm varian-ket-input" placeholder="Nama / Kode Varian (misal: Oak Natural 01)" value="${initialKet}" oninput="syncVarianListToTextarea('${containerId}', '${textareaId}')">
+        </div>
+        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.varian-row-item').remove(); syncVarianListToTextarea('${containerId}', '${textareaId}')" title="Hapus varian"><i class="fas fa-trash"></i></button>
+      `;
+      container.appendChild(row);
+      syncVarianListToTextarea(containerId, textareaId);
+    }
+
+    async function handleVarianUpload(inputEl, containerId, textareaId) {
+      const file = inputEl.files && inputEl.files[0];
+      if (!file) return;
+      const thumbBox = inputEl.closest('.varian-thumb-box');
+      const row = inputEl.closest('.varian-row-item');
+      thumbBox.innerHTML = `<div class="loading" style="width:16px;height:16px;"></div>`;
+      
+      try {
+        const url = await uploadFileToDrive(file);
+        row.dataset.url = url;
+        thumbBox.innerHTML = `
+          <img src="${url}">
+          <input type="file" accept="image/*" style="display:none" onchange="handleVarianUpload(this, '${containerId}', '${textareaId}')">
+        `;
+        syncVarianListToTextarea(containerId, textareaId);
+        showToast(`Foto varian berhasil diupload!`, 'success');
+      } catch(e) {
+        thumbBox.innerHTML = `
+          <div class="upload-prompt"><i class="fas fa-camera"></i><br>Foto</div>
+          <input type="file" accept="image/*" style="display:none" onchange="handleVarianUpload(this, '${containerId}', '${textareaId}')">
+        `;
+        showToast(`Gagal upload foto varian: ${e.message}`, 'error');
+      }
+    }
+
+    function syncVarianListToTextarea(containerId, textareaId) {
+      const container = document.getElementById(containerId);
+      const textarea = document.getElementById(textareaId);
+      if (!container || !textarea) return;
+      const lines = [];
+      container.querySelectorAll('.varian-row-item').forEach(row => {
+        const url = row.dataset.url || '';
+        const ketInput = row.querySelector('.varian-ket-input');
+        const ket = ketInput ? ketInput.value.trim() : '';
+        if (url || ket) {
+          lines.push(`${url}${ket ? ' | ' + ket : ''}`);
+        }
+      });
+      textarea.value = lines.join('\n');
+    }
+
+    function syncTextareaToVarianList(textareaId, containerId) {
+      const textarea = document.getElementById(textareaId);
+      const container = document.getElementById(containerId);
+      if (!textarea || !container) return;
+      container.innerHTML = '';
+      const varians = parseVarian(textarea.value);
+      if (varians.length === 0) {
+        container.innerHTML = '<div class="empty-varian-msg" style="font-size:12px;color:#999;text-align:center;padding:10px;background:var(--bg);border:1px dashed var(--border);border-radius:8px;">Belum ada varian. Klik tombol "+ Tambah Varian" di atas.</div>';
+        return;
+      }
+      varians.forEach(v => {
+        const link = typeof v === 'object' ? v.link : v;
+        const ket = typeof v === 'object' ? v.ket : '';
+        addVarianRow(containerId, textareaId, link, ket);
+      });
+    }
+
     function openModalProduk() {
       document.getElementById('newProdukNama').value = '';
       document.getElementById('newProdukDesc').value = '';
@@ -972,6 +1261,9 @@
       document.getElementById('newProdukLabelInput').value = '';
       setTags('newProdukLabelsContainer', ['Katalog Jualan']);
       renderExistingLabels('newProdukExistingLabels', 'newProdukLabelsContainer');
+      syncTextareaToGrid('newProdukHero', 'newProdukHeroGrid');
+      syncTextareaToVarianList('newProdukVarian', 'newProdukVarianList');
+      syncTextareaToGrid('newProdukGallery', 'newProdukGalleryGrid');
       openModal('modalProduk');
       switchModalTab('modalProduk', 'info', document.querySelector('#modalProduk .tab'));
     }
@@ -1047,9 +1339,12 @@
     function formatDriveThumbnail(url) {
       if (!url) return '';
       url = url.trim();
+      if (url.includes('googleusercontent.com') || url.includes('blogger.com') || url.includes('bp.blogspot.com')) {
+        return url;
+      }
       if (url.includes('drive.google.com')) {
         const match = url.match(/[-\w]{25,}/);
-        if (match) return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
+        if (match) return `https://lh3.googleusercontent.com/d/${match[0]}=s400`;
       }
       return url;
     }
@@ -1151,6 +1446,10 @@
         document.getElementById('editProdukGallery').value = '';
         document.getElementById('editProdukSpec').value = '';
       }
+
+      syncTextareaToGrid('editProdukHero', 'editProdukHeroGrid');
+      syncTextareaToVarianList('editProdukVarian', 'editProdukVarianList');
+      syncTextareaToGrid('editProdukGallery', 'editProdukGalleryGrid');
     }
 
     async function saveEditProduk() {
@@ -1256,6 +1555,10 @@
         varian.map(v => typeof v === 'object' ? `${v.link}${v.ket ? ' | ' + v.ket : ''}` : v).join('\n') : (varian || '');
       document.getElementById('editGallery').value = Array.isArray(gallery) ? gallery.join('\n') : (gallery || '');
       document.getElementById('editSpecs').value = specs || '';
+
+      syncTextareaToGrid('editHeroImages', 'editHeroImagesGrid');
+      syncTextareaToVarianList('editVarian', 'editVarianList');
+      syncTextareaToGrid('editGallery', 'editGalleryGrid');
 
       openModal('modalEditGambarSpec');
     }
