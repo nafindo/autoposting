@@ -55,6 +55,8 @@
     .section{display:none}.section.active{display:block}
     .keyword-section{display:none}
     .keyword-section.active{display:block}
+    .modal-tab-content{animation:fadeIn .2s}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:1000}
     .modal-overlay.active{display:flex}.modal{background:#fff;border-radius:16px;width:90%;max-width:600px;max-height:90vh;overflow-y:auto}
     .modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
@@ -253,13 +255,19 @@
 
           <div id="ktab-image" class="keyword-section">
             <div class="card">
-              <div class="card-header"><h3>Gambar Produk</h3></div>
+              <div class="card-header">
+                <h3><i class="fas fa-images"></i> Gambar Produk</h3>
+                <button class="btn btn-primary btn-sm" onclick="openEditGambarSpecModal()"><i class="fas fa-edit"></i> Edit Gambar & Spec</button>
+              </div>
               <div class="card-body" id="imagePanel">
                 <div class="empty-state"><i class="fas fa-images"></i><p>Data gambar akan ditampilkan di sini</p></div>
               </div>
             </div>
             <div class="card">
-              <div class="card-header"><h3>Spesifikasi Produk</h3></div>
+              <div class="card-header">
+                <h3><i class="fas fa-list-alt"></i> Spesifikasi Produk</h3>
+                <button class="btn btn-outline btn-sm" onclick="openEditGambarSpecModal()"><i class="fas fa-edit"></i> Edit Spec</button>
+              </div>
               <div class="card-body">
                 <pre id="specPanel" style="background:#f8f9fa;padding:16px;border-radius:8px;font-size:13px;white-space:pre-wrap;font-family:inherit"></pre>
               </div>
@@ -405,19 +413,175 @@
     </div>
   </div>
 
-  <!-- MODALS -->
+  <!-- MODAL TAMBAH PRODUK -->
   <div class="modal-overlay" id="modalProduk">
-    <div class="modal">
-      <div class="modal-header"><h3>Tambah Produk Baru</h3><i class="fas fa-times" style="cursor:pointer" onclick="closeModal('modalProduk')"></i></div>
+    <div class="modal" style="max-width:680px">
+      <div class="modal-header">
+        <h3><i class="fas fa-box-open" style="color:var(--primary);margin-right:8px"></i> Tambah Produk Baru</h3>
+        <i class="fas fa-times" style="cursor:pointer" onclick="closeModal('modalProduk')"></i>
+      </div>
       <div class="modal-body">
-        <div class="form-group"><label>Nama Produk</label><input type="text" class="form-control" id="newProdukNama" placeholder="Contoh: NOVA Tile"></div>
-        <div class="form-group"><label>Deskripsi</label><textarea class="form-control" id="newProdukDesc" placeholder="Deskripsi singkat"></textarea></div>
-        <div class="form-group"><label>Keyword Master <small style="font-weight:400;color:#888">(pisah koma, untuk auto-generate)</small></label><input type="text" class="form-control" id="newProdukMasterKeywords" placeholder="lantai kayu, vinyl flooring, parquet"></div>
-        <div class="form-group"><label>Prioritas (1-10, 1=paling tinggi)</label><input type="number" class="form-control" id="newProdukPriority" value="5" min="1" max="10"></div>
+        <div class="tabs" style="margin-bottom:20px">
+          <div class="tab active" onclick="switchModalTab('modalProduk', 'info', this)"><i class="fas fa-info-circle"></i> Info Dasar</div>
+          <div class="tab" onclick="switchModalTab('modalProduk', 'images', this)"><i class="fas fa-images"></i> Gambar Produk</div>
+          <div class="tab" onclick="switchModalTab('modalProduk', 'specs', this)"><i class="fas fa-list-alt"></i> Spesifikasi</div>
+        </div>
+
+        <!-- Tab 1: Info Dasar -->
+        <div id="modalProduk-tab-info" class="modal-tab-content">
+          <div class="form-group">
+            <label>Nama Produk <span style="color:var(--danger)">*</span></label>
+            <input type="text" class="form-control" id="newProdukNama" placeholder="Contoh: NOVA Tile">
+          </div>
+          <div class="form-group">
+            <label>Deskripsi Singkat</label>
+            <textarea class="form-control" id="newProdukDesc" rows="3" placeholder="Deskripsi ringkas produk"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Keyword Master <small style="font-weight:400;color:#888">(pisah koma, untuk auto-generate 50 keyword)</small></label>
+            <input type="text" class="form-control" id="newProdukMasterKeywords" placeholder="lantai kayu, vinyl flooring, parquet">
+          </div>
+          <div class="form-group">
+            <label>Prioritas Posting (1-10, 1=paling tinggi)</label>
+            <input type="number" class="form-control" id="newProdukPriority" value="5" min="1" max="10">
+          </div>
+        </div>
+
+        <!-- Tab 2: Gambar Produk -->
+        <div id="modalProduk-tab-images" class="modal-tab-content" style="display:none">
+          <div class="form-group">
+            <label>🖼️ Hero Images <small style="font-weight:400;color:#888">(1 link gambar/Google Drive per baris)</small></label>
+            <textarea class="form-control" id="newProdukHero" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://example.com/hero.jpg"></textarea>
+          </div>
+          <div class="form-group">
+            <label>🎨 Gallery & Varian <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Varian</code> per baris)</small></label>
+            <textarea class="form-control" id="newProdukGallery" rows="4" placeholder="https://drive.google.com/file/d/.../view | Teak Wood 01&#10;https://drive.google.com/file/d/.../view | Oak Natural 02"></textarea>
+          </div>
+          <div class="form-group">
+            <label>🎨 Saran Warna / Sample <small style="font-weight:400;color:#888">(1 link gambar per baris)</small></label>
+            <textarea class="form-control" id="newProdukSaranWarna" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://drive.google.com/file/d/.../view"></textarea>
+          </div>
+        </div>
+
+        <!-- Tab 3: Spesifikasi -->
+        <div id="modalProduk-tab-specs" class="modal-tab-content" style="display:none">
+          <div class="form-group">
+            <label>📋 Spesifikasi Produk <small style="font-weight:400;color:#888">(Ukuran, ketebalan, wear layer, kemasan, dll.)</small></label>
+            <textarea class="form-control" id="newProdukSpec" rows="7" placeholder="Ukuran: 15cm x 90cm&#10;Ketebalan: 3.0 mm&#10;Wear Layer: 0.3 mm&#10;Isi per Box: 24 pcs (3.24 m2)&#10;Material: 100% Virgin PVC"></textarea>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline" onclick="closeModal('modalProduk')">Batal</button>
-        <button class="btn btn-primary" onclick="saveProduk()">Simpan</button>
+        <button class="btn btn-primary" onclick="saveProduk()"><i class="fas fa-save"></i> Simpan Produk</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT PRODUK LENGKAP -->
+  <div class="modal-overlay" id="modalEditProduk">
+    <div class="modal" style="max-width:680px">
+      <div class="modal-header">
+        <h3><i class="fas fa-edit" style="color:var(--primary);margin-right:8px"></i> Edit Produk</h3>
+        <i class="fas fa-times" style="cursor:pointer" onclick="closeModal('modalEditProduk')"></i>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editProdukId">
+        <input type="hidden" id="editProdukSheetName">
+        <div class="tabs" style="margin-bottom:20px">
+          <div class="tab active" onclick="switchModalTab('modalEditProduk', 'info', this)"><i class="fas fa-info-circle"></i> Info Dasar</div>
+          <div class="tab" onclick="switchModalTab('modalEditProduk', 'images', this)"><i class="fas fa-images"></i> Gambar Produk</div>
+          <div class="tab" onclick="switchModalTab('modalEditProduk', 'specs', this)"><i class="fas fa-list-alt"></i> Spesifikasi</div>
+        </div>
+
+        <!-- Tab 1: Info Dasar -->
+        <div id="modalEditProduk-tab-info" class="modal-tab-content">
+          <div class="form-group">
+            <label>Nama Produk <span style="color:var(--danger)">*</span></label>
+            <input type="text" class="form-control" id="editProdukNama">
+          </div>
+          <div class="form-group">
+            <label>Deskripsi Singkat</label>
+            <textarea class="form-control" id="editProdukDesc" rows="3"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Status</label>
+              <select class="form-control" id="editProdukStatus">
+                <option value="Aktif">Aktif</option>
+                <option value="Nonaktif">Nonaktif</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Prioritas (1-10)</label>
+              <input type="number" class="form-control" id="editProdukPriority" min="1" max="10">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Gambar Produk -->
+        <div id="modalEditProduk-tab-images" class="modal-tab-content" style="display:none">
+          <div class="form-group">
+            <label>🖼️ Hero Images <small style="font-weight:400;color:#888">(1 per baris)</small></label>
+            <textarea class="form-control" id="editProdukHero" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>🎨 Gallery & Varian <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Varian</code>)</small></label>
+            <textarea class="form-control" id="editProdukGallery" rows="4"></textarea>
+          </div>
+          <div class="form-group">
+            <label>🎨 Saran Warna / Sample <small style="font-weight:400;color:#888">(1 per baris)</small></label>
+            <textarea class="form-control" id="editProdukSaranWarna" rows="3"></textarea>
+          </div>
+        </div>
+
+        <!-- Tab 3: Spesifikasi -->
+        <div id="modalEditProduk-tab-specs" class="modal-tab-content" style="display:none">
+          <div class="form-group">
+            <label>📋 Spesifikasi Produk</label>
+            <textarea class="form-control" id="editProdukSpec" rows="7"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modalEditProduk')">Batal</button>
+        <button class="btn btn-primary" id="btnSaveEditProduk" onclick="saveEditProduk()"><i class="fas fa-save"></i> Simpan Perubahan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT GAMBAR & SPEC CEPAT -->
+  <div class="modal-overlay" id="modalEditGambarSpec">
+    <div class="modal" style="max-width:680px">
+      <div class="modal-header">
+        <h3><i class="fas fa-images" style="color:var(--primary);margin-right:8px"></i> Edit Gambar & Spesifikasi Produk</h3>
+        <i class="fas fa-times" style="cursor:pointer" onclick="closeModal('modalEditGambarSpec')"></i>
+      </div>
+      <div class="modal-body">
+        <div class="form-group" style="background:#f8f9fa;padding:12px 16px;border-radius:8px;margin-bottom:16px">
+          <span style="font-size:13px;color:var(--text-sec)">Produk Terpilih:</span>
+          <div style="font-weight:700;font-size:16px;color:var(--primary)" id="editGambarSpecProdukNama">-</div>
+        </div>
+        <div class="form-group">
+          <label>🖼️ Hero Images <small style="font-weight:400;color:#888">(1 link gambar/Google Drive per baris)</small></label>
+          <textarea class="form-control" id="editHeroImages" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://example.com/hero.jpg"></textarea>
+        </div>
+        <div class="form-group">
+          <label>🎨 Gallery & Varian <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Varian</code> per baris)</small></label>
+          <textarea class="form-control" id="editGallery" rows="4" placeholder="https://drive.google.com/file/d/.../view | Teak Wood 01&#10;https://drive.google.com/file/d/.../view | Oak Natural 02"></textarea>
+        </div>
+        <div class="form-group">
+          <label>🎨 Saran Warna / Sample <small style="font-weight:400;color:#888">(1 link gambar per baris)</small></label>
+          <textarea class="form-control" id="editSaranWarna" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://drive.google.com/file/d/.../view"></textarea>
+        </div>
+        <div class="form-group">
+          <label>📋 Spesifikasi Produk <small style="font-weight:400;color:#888">(Ukuran, ketebalan, wear layer, isi/box, dll.)</small></label>
+          <textarea class="form-control" id="editSpecs" rows="6" placeholder="Ukuran: ...&#10;Ketebalan: ..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modalEditGambarSpec')">Batal</button>
+        <button class="btn btn-primary" id="btnSaveGambarSpec" onclick="saveEditGambarSpec()"><i class="fas fa-save"></i> Simpan Perubahan</button>
       </div>
     </div>
   </div>
@@ -697,6 +861,50 @@
       `).join('');
     }
 
+    // ==================== MODAL TAB SWITCHER ====================
+    function switchModalTab(modalId, tabName, el) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      modal.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+      modal.querySelectorAll('.modal-tab-content').forEach(c => c.style.display = 'none');
+      if (el) el.classList.add('active');
+      const target = document.getElementById(`${modalId}-tab-${tabName}`);
+      if (target) target.style.display = 'block';
+    }
+
+    function parseImageUrls(text) {
+      if (!text) return [];
+      return text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+    }
+
+    function parseGallery(text) {
+      if (!text) return [];
+      return text.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => {
+          const parts = line.split('|');
+          if (parts.length > 1) {
+            return { link: parts[0].trim(), ket: parts.slice(1).join('|').trim() };
+          }
+          const commaParts = line.split(',');
+          if (commaParts.length > 1 && commaParts[0].includes('http')) {
+            return { link: commaParts[0].trim(), ket: commaParts.slice(1).join(',').trim() };
+          }
+          return { link: line, ket: '' };
+        });
+    }
+
+    function formatDriveThumbnail(url) {
+      if (!url) return '';
+      url = url.trim();
+      if (url.includes('drive.google.com')) {
+        const match = url.match(/[-\w]{25,}/);
+        if (match) return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w400`;
+      }
+      return url;
+    }
+
     async function saveProduk() {
       const nama = document.getElementById('newProdukNama').value.trim();
       const desc = document.getElementById('newProdukDesc').value.trim();
@@ -704,18 +912,39 @@
       const masterKeywords = document.getElementById('newProdukMasterKeywords').value
         .split(',').map(k => k.trim()).filter(k => k);
       
+      const heroImages = parseImageUrls(document.getElementById('newProdukHero').value);
+      const gallery = parseGallery(document.getElementById('newProdukGallery').value);
+      const saranWarna = parseImageUrls(document.getElementById('newProdukSaranWarna').value);
+      const specs = document.getElementById('newProdukSpec').value.trim();
+
       if (!nama) { showToast('Nama produk wajib diisi!', 'error'); return; }
       
       try {
-        const res = await apiPost('addProduk', { nama, deskripsi: desc, prioritas: priority, masterKeywords });
+        const res = await apiPost('addProduk', {
+          nama,
+          deskripsi: desc,
+          prioritas: priority,
+          masterKeywords,
+          heroImages,
+          gallery,
+          saranWarna,
+          specs
+        });
         if (res.success) {
-          showToast(`Produk ditambahkan! ${res.sheetName} + 50 keyword auto-generated`, 'success');
+          showToast(`Produk ditambahkan! ${res.sheetName || nama} + 50 keyword auto-generated`, 'success');
           closeModal('modalProduk');
           document.getElementById('newProdukNama').value = '';
+          document.getElementById('newProdukDesc').value = '';
           document.getElementById('newProdukMasterKeywords').value = '';
+          document.getElementById('newProdukHero').value = '';
+          document.getElementById('newProdukGallery').value = '';
+          document.getElementById('newProdukSaranWarna').value = '';
+          document.getElementById('newProdukSpec').value = '';
           loadProduk();
+        } else {
+          showToast('Gagal menambah produk: ' + (res.error || 'Unknown error'), 'error');
         }
-      } catch(e) { showToast('Gagal menambah produk', 'error'); }
+      } catch(e) { showToast('Gagal menambah produk: ' + e.message, 'error'); }
     }
 
     async function deleteProduk(id) {
@@ -730,19 +959,103 @@
     async function editProduk(id) {
       const p = produkList.find(x => x.id === id);
       if (!p) return;
-      const newNama = prompt('Nama Produk:', p.nama);
-      if (newNama === null) return;
-      const newDesc = prompt('Deskripsi:', p.deskripsi);
-      const newStatus = prompt('Status (Aktif/Nonaktif):', p.status);
-      const newPriority = prompt('Prioritas (1-10):', p.prioritas);
+
+      document.getElementById('editProdukId').value = p.id;
+      document.getElementById('editProdukNama').value = p.nama || '';
+      document.getElementById('editProdukDesc').value = p.deskripsi || '';
+      document.getElementById('editProdukPriority').value = p.prioritas || 5;
+      document.getElementById('editProdukStatus').value = p.status || 'Aktif';
+
+      const sheetName = `PRODUK_${p.nama.replace(/\s+/g, '_').substring(0, 20)}`;
+      document.getElementById('editProdukSheetName').value = sheetName;
+      document.getElementById('editProdukHero').value = 'Memuat...';
+      document.getElementById('editProdukGallery').value = 'Memuat...';
+      document.getElementById('editProdukSaranWarna').value = 'Memuat...';
+      document.getElementById('editProdukSpec').value = 'Memuat...';
+
+      openModal('modalEditProduk');
+      switchModalTab('modalEditProduk', 'info', document.querySelector('#modalEditProduk .tab'));
+
       try {
-        await apiPost('updateProduk', { id, nama: newNama, deskripsi: newDesc, status: newStatus, prioritas: parseInt(newPriority) });
-        showToast('Produk diupdate', 'success');
+        const data = await apiGet('getProdukData', { sheetName });
+        if (data && data.success) {
+          const hero = data.heroImages || [];
+          const gallery = data.gallery || [];
+          const saran = data.saranWarna || [];
+          const specs = data.specs || '';
+          document.getElementById('editProdukHero').value = Array.isArray(hero) ? hero.join('\n') : (hero || '');
+          document.getElementById('editProdukGallery').value = Array.isArray(gallery) ? 
+            gallery.map(g => typeof g === 'object' ? `${g.link}${g.ket ? ' | ' + g.ket : ''}` : g).join('\n') : (gallery || '');
+          document.getElementById('editProdukSaranWarna').value = Array.isArray(saran) ? saran.join('\n') : (saran || '');
+          document.getElementById('editProdukSpec').value = specs || '';
+        } else {
+          document.getElementById('editProdukHero').value = '';
+          document.getElementById('editProdukGallery').value = '';
+          document.getElementById('editProdukSaranWarna').value = '';
+          document.getElementById('editProdukSpec').value = '';
+        }
+      } catch(e) {
+        document.getElementById('editProdukHero').value = '';
+        document.getElementById('editProdukGallery').value = '';
+        document.getElementById('editProdukSaranWarna').value = '';
+        document.getElementById('editProdukSpec').value = '';
+      }
+    }
+
+    async function saveEditProduk() {
+      const id = document.getElementById('editProdukId').value;
+      const sheetName = document.getElementById('editProdukSheetName').value;
+      const nama = document.getElementById('editProdukNama').value.trim();
+      const desc = document.getElementById('editProdukDesc').value.trim();
+      const priority = parseInt(document.getElementById('editProdukPriority').value) || 5;
+      const status = document.getElementById('editProdukStatus').value;
+
+      const heroImages = parseImageUrls(document.getElementById('editProdukHero').value);
+      const gallery = parseGallery(document.getElementById('editProdukGallery').value);
+      const saranWarna = parseImageUrls(document.getElementById('editProdukSaranWarna').value);
+      const specs = document.getElementById('editProdukSpec').value.trim();
+
+      if (!nama) { showToast('Nama produk wajib diisi!', 'error'); return; }
+
+      const btn = document.getElementById('btnSaveEditProduk');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="loading" style="width:14px;height:14px;border-width:2px"></div> Menyimpan...';
+
+      try {
+        await apiPost('updateProduk', {
+          id,
+          sheetName,
+          nama,
+          deskripsi: desc,
+          status,
+          prioritas: priority,
+          heroImages,
+          gallery,
+          saranWarna,
+          specs
+        });
+
+        if (sheetName) {
+          await apiPost('updateProdukData', { sheetName, heroImages, gallery, saranWarna, specs }).catch(() => {});
+        }
+
+        showToast('Produk berhasil diupdate!', 'success');
+        closeModal('modalEditProduk');
         loadProduk();
-      } catch(e) { showToast('Gagal update', 'error'); }
+        if (currentProdukSheet === sheetName) {
+          loadKeywordData();
+        }
+      } catch(e) {
+        showToast('Gagal update produk: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Simpan Perubahan';
+      }
     }
 
     // ==================== KEYWORD ====================
+    let currentProdukData = null;
+
     async function initKeywordPage() {
       try {
         const res = await apiGet('getProdukList');
@@ -756,7 +1069,7 @@
     async function loadKeywordData() {
       const select = document.getElementById('selectProdukKeyword');
       const sheetName = select.value;
-      currentProdukId = select.options[select.selectedIndex].dataset.id || '';
+      currentProdukId = select.options[select.selectedIndex]?.dataset?.id || '';
       const panel = document.getElementById('keywordPanel');
       if (!sheetName) { panel.style.display = 'none'; return; }
       currentProdukSheet = sheetName;
@@ -765,12 +1078,76 @@
       try {
         const data = await apiGet('getProdukData', { sheetName });
         if (data.success) {
+          currentProdukData = data;
           renderKeywordTable(data.keywords);
           renderImagePanel(data);
           renderSpecPanel(data.specs);
           populatePreviewSelect(data.keywords);
         }
       } catch(e) { showToast('Gagal memuat data', 'error'); }
+    }
+
+    function openEditGambarSpecModal() {
+      if (!currentProdukSheet) { showToast('Pilih produk terlebih dahulu!', 'error'); return; }
+      const select = document.getElementById('selectProdukKeyword');
+      const produkNama = select.options[select.selectedIndex]?.text || currentProdukSheet;
+      document.getElementById('editGambarSpecProdukNama').textContent = produkNama;
+
+      const hero = currentProdukData?.heroImages || [];
+      const gallery = currentProdukData?.gallery || [];
+      const saran = currentProdukData?.saranWarna || [];
+      const specs = currentProdukData?.specs || '';
+
+      document.getElementById('editHeroImages').value = Array.isArray(hero) ? hero.join('\n') : (hero || '');
+      document.getElementById('editGallery').value = Array.isArray(gallery) ? 
+        gallery.map(g => typeof g === 'object' ? `${g.link}${g.ket ? ' | ' + g.ket : ''}` : g).join('\n') : (gallery || '');
+      document.getElementById('editSaranWarna').value = Array.isArray(saran) ? saran.join('\n') : (saran || '');
+      document.getElementById('editSpecs').value = specs || '';
+
+      openModal('modalEditGambarSpec');
+    }
+
+    async function saveEditGambarSpec() {
+      if (!currentProdukSheet) { showToast('Pilih produk terlebih dahulu!', 'error'); return; }
+      const btn = document.getElementById('btnSaveGambarSpec');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="loading" style="width:14px;height:14px;border-width:2px"></div> Menyimpan...';
+
+      const heroImages = parseImageUrls(document.getElementById('editHeroImages').value);
+      const gallery = parseGallery(document.getElementById('editGallery').value);
+      const saranWarna = parseImageUrls(document.getElementById('editSaranWarna').value);
+      const specs = document.getElementById('editSpecs').value.trim();
+
+      try {
+        const res = await apiPost('updateProdukData', {
+          sheetName: currentProdukSheet,
+          produkId: currentProdukId,
+          heroImages,
+          gallery,
+          saranWarna,
+          specs
+        });
+
+        if (currentProdukId) {
+          await apiPost('updateProduk', {
+            id: currentProdukId,
+            sheetName: currentProdukSheet,
+            heroImages,
+            gallery,
+            saranWarna,
+            specs
+          }).catch(() => {});
+        }
+
+        showToast('Gambar & Spesifikasi berhasil disimpan!', 'success');
+        closeModal('modalEditGambarSpec');
+        loadKeywordData();
+      } catch(e) {
+        showToast('Error menyimpan: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Simpan Perubahan';
+      }
     }
 
     function renderKeywordTable(keywords) {
@@ -797,39 +1174,52 @@
     function renderImagePanel(data) {
       const panel = document.getElementById('imagePanel');
       const hero = data.heroImages || [];
-      const gallery = data.gallery || [];
+      const gallery = (data.gallery || []).map(g => {
+        if (typeof g === 'object' && g !== null) return g;
+        if (typeof g === 'string') {
+          const parts = g.split('|');
+          return { link: parts[0].trim(), ket: parts.slice(1).join('|').trim() };
+        }
+        return { link: '', ket: '' };
+      });
       const saran = data.saranWarna || [];
       
       panel.innerHTML = `
         <div style="margin-bottom:20px">
-          <h4 style="margin-bottom:10px;font-size:14px;color:var(--text-sec)">🖼️ Hero Images (${hero.length})</h4>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <h4 style="font-size:14px;color:var(--text-sec)">🖼️ Hero Images (${hero.length})</h4>
+          </div>
           <div class="image-grid">
-            ${hero.slice(0,8).map(url => `
-              <div class="image-item">
-                <img src="${url.includes('drive.google.com') ? 'https://drive.google.com/thumbnail?id=' + (url.match(/[-\\w]{25,}/)?.[0] || '') + '&sz=w400' : url}" onerror="this.parentElement.style.display='none'">
+            ${hero.map(url => `
+              <div class="image-item" title="${url}">
+                <img src="${formatDriveThumbnail(url)}" alt="Hero Image" onerror="this.parentElement.style.opacity='0.3'">
               </div>
-            `).join('') || '<span style="color:#999;font-size:13px">Tidak ada gambar</span>'}
+            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada gambar</span>'}
           </div>
         </div>
         <div style="margin-bottom:20px">
-          <h4 style="margin-bottom:10px;font-size:14px;color:var(--text-sec)">🎨 Gallery (${gallery.length})</h4>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <h4 style="font-size:14px;color:var(--text-sec)">🎨 Gallery (${gallery.length})</h4>
+          </div>
           <div class="image-grid">
-            ${gallery.slice(0,8).map(g => `
-              <div class="image-item">
-                <img src="${g.link.includes('drive.google.com') ? 'https://drive.google.com/thumbnail?id=' + (g.link.match(/[-\\w]{25,}/)?.[0] || '') + '&sz=w400' : g.link}" onerror="this.parentElement.style.display='none'">
+            ${gallery.map(g => `
+              <div class="image-item" title="${g.ket || g.link}">
+                <img src="${formatDriveThumbnail(g.link)}" alt="${g.ket || 'Gallery'}" onerror="this.parentElement.style.opacity='0.3'">
                 <div class="name">${g.ket || 'Variant'}</div>
               </div>
-            `).join('') || '<span style="color:#999;font-size:13px">Tidak ada gallery</span>'}
+            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada gallery</span>'}
           </div>
         </div>
         <div>
-          <h4 style="margin-bottom:10px;font-size:14px;color:var(--text-sec)">🎨 Saran Warna (${saran.length})</h4>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <h4 style="font-size:14px;color:var(--text-sec)">🎨 Saran Warna (${saran.length})</h4>
+          </div>
           <div class="image-grid">
-            ${saran.slice(0,8).map(url => `
-              <div class="image-item">
-                <img src="${url.includes('drive.google.com') ? 'https://drive.google.com/thumbnail?id=' + (url.match(/[-\\w]{25,}/)?.[0] || '') + '&sz=w400' : url}" onerror="this.parentElement.style.display='none'">
+            ${saran.map(url => `
+              <div class="image-item" title="${url}">
+                <img src="${formatDriveThumbnail(url)}" alt="Saran Warna" onerror="this.parentElement.style.opacity='0.3'">
               </div>
-            `).join('') || '<span style="color:#999;font-size:13px">Tidak ada saran warna</span>'}
+            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada saran warna</span>'}
           </div>
         </div>
       `;
