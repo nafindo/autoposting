@@ -1043,30 +1043,63 @@
       arr.forEach(t => addTag(containerId, t));
     }
 
-    // ==================== IMAGE UPLOAD & PREVIEWS ====================
-    async function uploadFileToDrive(file) {
+    // ==================== IMAGE UPLOAD & COMPRESSION ====================
+    async function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.82) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = async function(e) {
-          try {
-            const base64 = e.target.result;
-            const res = await apiPost('uploadImage', {
-              name: file.name,
-              type: file.type,
-              base64: base64
-            });
-            if (res && res.success) {
-              resolve(res.url);
-            } else {
-              reject(new Error(res.error || 'Upload gagal'));
+        reader.onload = function(e) {
+          const img = new Image();
+          img.onload = function() {
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth || height > maxHeight) {
+              if (width / height > maxWidth / maxHeight) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              } else {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
             }
-          } catch(err) {
-            reject(err);
-          }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            resolve({
+              base64: dataUrl,
+              name: file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+              type: "image/jpeg"
+            });
+          };
+          img.onerror = () => reject(new Error('Gagal memproses file gambar'));
+          img.src = e.target.result;
         };
         reader.onerror = () => reject(new Error('Gagal membaca file'));
         reader.readAsDataURL(file);
       });
+    }
+
+    async function uploadFileToDrive(file) {
+      // 1. Kompresi gambar otomatis di browser agar ukuran kecil (50-200KB) dan upload cepat
+      const compressed = await compressImage(file, 1200, 1200, 0.82);
+      
+      // 2. Upload base64 yang sudah dikompresi ke Google Drive via Apps Script
+      const res = await apiPost('uploadImage', {
+        name: compressed.name,
+        type: compressed.type,
+        base64: compressed.base64
+      });
+
+      if (res && res.success && res.url) {
+        return res.url;
+      } else {
+        throw new Error((res && res.error) || 'Upload gagal disimpan di Google Drive');
+      }
     }
 
     async function handleImageUpload(inputEl, gridId, textareaId) {

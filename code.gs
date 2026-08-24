@@ -1532,54 +1532,62 @@ function getImageUrlFromLink(url) {
 }
 
 function uploadImage(name, type, base64Data, folderId) {
-  const config = getConfig();
-  let folder;
-  const targetFolderId = folderId || config.DRIVE_FOLDER_ID;
-  
-  if (targetFolderId) {
+  try {
+    const config = getConfig();
+    let folder = null;
+    const targetFolderId = folderId || config.DRIVE_FOLDER_ID;
+    
+    if (targetFolderId) {
+      try {
+        folder = DriveApp.getFolderById(targetFolderId);
+      } catch(e) {
+        console.warn("Folder ID tidak valid: " + e);
+      }
+    }
+    
+    if (!folder) {
+      const folders = DriveApp.getFoldersByName("AutoPosting_Uploads");
+      if (folders.hasNext()) {
+        folder = folders.next();
+      } else {
+        folder = DriveApp.createFolder("AutoPosting_Uploads");
+      }
+    }
+    
+    // Set sharing folder ke publik agar gambar selalu bisa diakses publik
     try {
-      folder = DriveApp.getFolderById(targetFolderId);
-    } catch(e) {
-      console.warn("Folder ID tidak valid, mencari atau membuat folder AutoPosting_Uploads: " + e);
-    }
+      folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch(e) {}
+    
+    const cleanBase64 = String(base64Data || '').replace(/^data:image\/[a-zA-Z0-9+]+;base64,/, '');
+    const decoded = Utilities.base64Decode(cleanBase64);
+    const fileName = name || ('img_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '.jpg');
+    const blob = Utilities.newBlob(decoded, type || 'image/jpeg', fileName);
+    
+    const file = folder.createFile(blob);
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch(e) {}
+    
+    const fileId = file.getId();
+    // Google UserContent CDN link langsung (resmi, cepat, tanpa batasan viewer)
+    const directUrl = `https://lh3.googleusercontent.com/d/${fileId}=s1200`;
+    const viewUrl = file.getUrl();
+    
+    return {
+      success: true,
+      fileId: fileId,
+      url: directUrl,
+      viewUrl: viewUrl,
+      name: fileName
+    };
+  } catch(err) {
+    console.error("Gagal upload foto ke Drive: " + err);
+    return {
+      success: false,
+      error: "Gagal upload ke Google Drive: " + err.toString()
+    };
   }
-  
-  if (!folder) {
-    const folders = DriveApp.getFoldersByName("AutoPosting_Uploads");
-    if (folders.hasNext()) {
-      folder = folders.next();
-    } else {
-      folder = DriveApp.createFolder("AutoPosting_Uploads");
-    }
-  }
-  
-  // Set sharing folder ke publik agar gambar selalu bisa diakses publik
-  try {
-    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  } catch(e) {}
-  
-  const cleanBase64 = String(base64Data || '').replace(/^data:image\/[a-zA-Z0-9+]+;base64,/, '');
-  const decoded = Utilities.base64Decode(cleanBase64);
-  const fileName = name || ('img_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '.jpg');
-  const blob = Utilities.newBlob(decoded, type || 'image/jpeg', fileName);
-  
-  const file = folder.createFile(blob);
-  try {
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  } catch(e) {}
-  
-  const fileId = file.getId();
-  // Google UserContent CDN link langsung (resmi, cepat, tanpa batasan viewer)
-  const directUrl = `https://lh3.googleusercontent.com/d/${fileId}=s1200`;
-  const viewUrl = file.getUrl();
-  
-  return {
-    success: true,
-    fileId: fileId,
-    url: directUrl,
-    viewUrl: viewUrl,
-    name: fileName
-  };
 }
 
 function authorizeBlogger() {
