@@ -48,6 +48,7 @@ function doGet(e) {
       case 'getMasterKeywords': result = getMasterKeywords(e.parameter.produkId); break;
       case 'getQueueStatus': result = getQueueStatus(); break;
       case 'checkBloggerAuth': result = authorizeBlogger(); break;
+      case 'checkDriveAuth': result = testDriveAuth(); break;
       case 'getAllLabels': result = { success: true, labels: getAllLabels() }; break;
     }
   } catch(err) {
@@ -1628,5 +1629,31 @@ function authorizeBlogger() {
   } else {
     console.error("GAGAL: " + text);
     return { success: false, code: code, text: text };
+  }
+}
+
+function testDriveAuth() {
+  console.log("=== MEMULAI TEST OTORISASI GOOGLE DRIVE ===");
+  try {
+    const folders = DriveApp.getFoldersByName("AutoPosting_Uploads");
+    let folder;
+    if (folders.hasNext()) {
+      folder = folders.next();
+    } else {
+      folder = DriveApp.createFolder("AutoPosting_Uploads");
+    }
+    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    
+    // Buat file tes untuk memicu popup otorisasi tulis Google Drive
+    const blob = Utilities.newBlob("Drive Upload Auth Test", "text/plain", "test_drive_auth.txt");
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    file.setTrashed(true); // langsung hapus file tes
+    
+    console.log("SUKSES: Google Drive terotorisasi dan siap mengupload foto!");
+    return { success: true, folderId: folder.getId() };
+  } catch(e) {
+    console.error("GAGAL OTORISASI DRIVE: " + e.toString());
+    return { success: false, error: e.toString() };
   }
 }
