@@ -1070,17 +1070,19 @@ function buatPostinganOtomatis() {
       tabelAi: aiData.table, gallery: pData.gallery || pData.saranWarna, varian: pData.varian || pData.galleryVarian
     });
     
-    const berhasil = postKeBlogger(finalTitle, finalHtml, labels);
+    const resBlogger = postKeBlogger(finalTitle, finalHtml, labels);
     
-    if (berhasil) {
+    if (resBlogger && resBlogger.success) {
       const sheet = ss.getSheetByName(item.sheetName);
       sheet.getRange(item.row, 2).setValue(finalTitle);
       sheet.getRange(item.row, 7).setValue('Selesai');
       sheet.getRange(item.row, 8).setValue(new Date());
-      addLog(item.produkNama, item.keyword, 'Sukses', '', '');
+      if (resBlogger.url) sheet.getRange(item.row, 11).setValue(resBlogger.url);
+      addLog(item.produkNama, item.keyword, 'Sukses', resBlogger.url || '', '');
       console.log("BERHASIL: " + finalTitle);
     } else {
-      addLog(item.produkNama, item.keyword, 'Gagal', '', 'Blogger error');
+      const err = resBlogger ? (resBlogger.error || 'Blogger error') : 'Blogger error';
+      addLog(item.produkNama, item.keyword, 'Gagal', '', err);
     }
   } catch(e) {
     addLog(item.produkNama, item.keyword, 'Gagal', '', e.toString());
@@ -1093,6 +1095,10 @@ function postManual(produkNama, keyword, row) {
   const sheetName = 'PRODUK_' + produkNama.replace(/\s+/g, '_').substring(0, 20);
   
   const pData = getProdukData(sheetName);
+  if (!pData || !pData.success) {
+    return { success: false, error: 'Sheet produk ' + sheetName + ' tidak ditemukan' };
+  }
+
   const sheet = ss.getSheetByName(sheetName);
   const rowData = sheet.getRange(row, 1, 1, 11).getValues()[0];
   
@@ -1108,11 +1114,13 @@ function postManual(produkNama, keyword, row) {
   }
   const labels = labelRaw ? String(labelRaw).split(',').map(l => l.trim()) : ['Katalog Jualan'];
   
-  const heroLink = pData.heroImages[Math.floor(Math.random() * pData.heroImages.length)];
+  const heroLink = (pData.heroImages && pData.heroImages.length > 0)
+    ? pData.heroImages[Math.floor(Math.random() * pData.heroImages.length)]
+    : '';
   const heroThumb = getImageUrlFromLink(heroLink);
   
   const aiData = getAIDescription(produkNama, keyword, rowData[4] || '', pData.specs);
-  if (!aiData) return { success: false, error: 'AI gagal' };
+  if (!aiData) return { success: false, error: 'AI gagal membuat deskripsi' };
   
   const finalTitle = rowData[1] || aiData.title;
   const finalHtml = buildModernTemplate({
@@ -1121,16 +1129,20 @@ function postManual(produkNama, keyword, row) {
     tabelAi: aiData.table, gallery: pData.gallery || pData.saranWarna, varian: pData.varian || pData.galleryVarian
   });
   
-  const berhasil = postKeBlogger(finalTitle, finalHtml, labels);
+  const resBlogger = postKeBlogger(finalTitle, finalHtml, labels);
   
-  if (berhasil) {
+  if (resBlogger && resBlogger.success) {
     sheet.getRange(row, 2).setValue(finalTitle);
     sheet.getRange(row, 7).setValue('Selesai');
     sheet.getRange(row, 8).setValue(new Date());
-    addLog(produkNama, keyword, 'Sukses (Manual)', '', '');
-    return { success: true, title: finalTitle };
+    if (resBlogger.url) sheet.getRange(row, 11).setValue(resBlogger.url);
+    addLog(produkNama, keyword, 'Sukses (Manual)', resBlogger.url || '', '');
+    return { success: true, title: finalTitle, url: resBlogger.url };
   }
-  return { success: false, error: 'Gagal post' };
+  
+  const errDetail = resBlogger ? (resBlogger.error || 'Blogger error') : 'Gagal post ke Blogger';
+  addLog(produkNama, keyword, 'Gagal (Manual)', '', errDetail);
+  return { success: false, error: errDetail };
 }
 
 function previewPost(produkNama, keyword, row) {
@@ -1340,21 +1352,67 @@ function buildModernTemplate(d) {
 
 function postKeBlogger(title, content, labels) {
   const config = getConfig();
-  const url = `https://www.googleapis.com/blogger/v3/blogs/${config.BLOG_ID}/posts/`;
-  
-  const res = UrlFetchApp.fetch(url, {
-    method: 'post', contentType: 'application/json',
-    headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() },
-    payload: JSON.stringify({ title: title || 'Untitled', content: content || '<p>No content</p>', labels: labels || ['Katalog'] }),
-    muteHttpExceptions: true
-  });
-  
-  const code = res.getResponseCode();
-  if (code >= 300) {
-    console.error('Blogger Error ' + code + ': ' + res.getContentText().substring(0, 300));
-    return false;
+  const blogId = String(config.BLOG_ID).trim();
+  if (!blogId) {
+    return { success: false, error: 'BLOG_ID belum diisi di Pengaturan' };
   }
-  return true;
+
+  // 1. Jika Advanced Service Blogger diaktifkan di Apps Script Services
+  if (typeof Blogger !== 'undefined' && Blogger.Posts && Blogger.Posts.insert) {
+    try {
+      const res = Blogger.Posts.insert({
+        title: title || 'Untitled',
+        content: content || '<p>No content</p>',
+        labels: Array.isArray(labels) ? labels : ['Katalog']
+      }, blogId);
+      if (res && (res.id || res.url)) {
+        return { success: true, url: res.url || res.selfLink, id: res.id };
+      }
+    } catch(e) {
+      console.warn('Blogger Advanced Service gagal: ' + e + ', mencoba via REST API UrlFetchApp...');
+    }
+  }
+
+  // 2. Menggunakan REST API via UrlFetchApp
+  const url = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/`;
+  try {
+    const res = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() },
+      payload: JSON.stringify({
+        title: title || 'Untitled',
+        content: content || '<p>No content</p>',
+        labels: Array.isArray(labels) ? labels : ['Katalog']
+      }),
+      muteHttpExceptions: true
+    });
+    
+    const code = res.getResponseCode();
+    const text = res.getContentText();
+    if (code >= 300) {
+      console.error('Blogger API Error ' + code + ': ' + text);
+      let errMsg = 'Blogger Error (' + code + ')';
+      try {
+        const errJson = JSON.parse(text);
+        if (errJson.error && errJson.error.message) {
+          errMsg += ': ' + errJson.error.message;
+          if (code === 401 || code === 403) {
+            errMsg += '. Izin akses Blogger belum diaktifkan di Google Apps Script.';
+          }
+        }
+      } catch(e) {
+        errMsg += ': ' + text.substring(0, 150);
+      }
+      return { success: false, error: errMsg };
+    }
+    
+    const json = JSON.parse(text);
+    return { success: true, url: json.url || json.selfLink, id: json.id };
+  } catch(e) {
+    console.error('postKeBlogger Exception: ' + e);
+    return { success: false, error: 'Gagal koneksi Blogger: ' + e.toString() };
+  }
 }
 
 function parseLinks(raw) {
