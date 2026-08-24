@@ -256,8 +256,8 @@
           <div id="ktab-image" class="keyword-section">
             <div class="card">
               <div class="card-header">
-                <h3><i class="fas fa-images"></i> Gambar Produk</h3>
-                <button class="btn btn-primary btn-sm" onclick="openEditGambarSpecModal()"><i class="fas fa-edit"></i> Edit Gambar & Spec</button>
+                <h3><i class="fas fa-images"></i> Gambar & Varian Produk</h3>
+                <button class="btn btn-primary btn-sm" onclick="openEditGambarSpecModal()"><i class="fas fa-edit"></i> Edit Gambar, Varian & Spec</button>
               </div>
               <div class="card-body" id="imagePanel">
                 <div class="empty-state"><i class="fas fa-images"></i><p>Data gambar akan ditampilkan di sini</p></div>
@@ -447,19 +447,19 @@
           </div>
         </div>
 
-        <!-- Tab 2: Gambar Produk -->
+        <!-- Tab 2: Gambar & Varian Produk -->
         <div id="modalProduk-tab-images" class="modal-tab-content" style="display:none">
           <div class="form-group">
             <label>🖼️ Hero Images <small style="font-weight:400;color:#888">(1 link gambar/Google Drive per baris)</small></label>
             <textarea class="form-control" id="newProdukHero" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://example.com/hero.jpg"></textarea>
           </div>
           <div class="form-group">
-            <label>🎨 Gallery & Varian <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Varian</code> per baris)</small></label>
-            <textarea class="form-control" id="newProdukGallery" rows="4" placeholder="https://drive.google.com/file/d/.../view | Teak Wood 01&#10;https://drive.google.com/file/d/.../view | Oak Natural 02"></textarea>
+            <label>🎨 Varian Produk <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Nama Varian</code> per baris)</small></label>
+            <textarea class="form-control" id="newProdukVarian" rows="4" placeholder="https://drive.google.com/file/d/.../view | Teak Wood 01&#10;https://drive.google.com/file/d/.../view | Oak Natural 02"></textarea>
           </div>
           <div class="form-group">
-            <label>🎨 Saran Warna / Sample <small style="font-weight:400;color:#888">(1 link gambar per baris)</small></label>
-            <textarea class="form-control" id="newProdukSaranWarna" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://drive.google.com/file/d/.../view"></textarea>
+            <label>🖼️ Gallery Produk <small style="font-weight:400;color:#888">(1 link gambar per baris)</small></label>
+            <textarea class="form-control" id="newProdukGallery" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://drive.google.com/file/d/.../view"></textarea>
           </div>
         </div>
 
@@ -490,7 +490,7 @@
         <input type="hidden" id="editProdukSheetName">
         <div class="tabs" style="margin-bottom:20px">
           <div class="tab active" onclick="switchModalTab('modalEditProduk', 'info', this)"><i class="fas fa-info-circle"></i> Info Dasar</div>
-          <div class="tab" onclick="switchModalTab('modalEditProduk', 'images', this)"><i class="fas fa-images"></i> Gambar Produk</div>
+          <div class="tab" onclick="switchModalTab('modalEditProduk', 'images', this)"><i class="fas fa-images"></i> Gambar & Varian</div>
           <div class="tab" onclick="switchModalTab('modalEditProduk', 'specs', this)"><i class="fas fa-list-alt"></i> Spesifikasi</div>
         </div>
 
@@ -519,19 +519,19 @@
           </div>
         </div>
 
-        <!-- Tab 2: Gambar Produk -->
+        <!-- Tab 2: Gambar & Varian Produk -->
         <div id="modalEditProduk-tab-images" class="modal-tab-content" style="display:none">
           <div class="form-group">
             <label>🖼️ Hero Images <small style="font-weight:400;color:#888">(1 per baris)</small></label>
             <textarea class="form-control" id="editProdukHero" rows="3"></textarea>
           </div>
           <div class="form-group">
-            <label>🎨 Gallery & Varian <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Varian</code>)</small></label>
-            <textarea class="form-control" id="editProdukGallery" rows="4"></textarea>
+            <label>🎨 Varian Produk <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Nama Varian</code>)</small></label>
+            <textarea class="form-control" id="editProdukVarian" rows="4"></textarea>
           </div>
           <div class="form-group">
-            <label>🎨 Saran Warna / Sample <small style="font-weight:400;color:#888">(1 per baris)</small></label>
-            <textarea class="form-control" id="editProdukSaranWarna" rows="3"></textarea>
+            <label>🖼️ Gallery Produk <small style="font-weight:400;color:#888">(1 per baris)</small></label>
+            <textarea class="form-control" id="editProdukGallery" rows="3"></textarea>
           </div>
         </div>
 
@@ -554,7 +554,7 @@
   <div class="modal-overlay" id="modalEditGambarSpec">
     <div class="modal" style="max-width:680px">
       <div class="modal-header">
-        <h3><i class="fas fa-images" style="color:var(--primary);margin-right:8px"></i> Edit Gambar & Spesifikasi Produk</h3>
+        <h3><i class="fas fa-images" style="color:var(--primary);margin-right:8px"></i> Edit Gambar, Varian & Spesifikasi Produk</h3>
         <i class="fas fa-times" style="cursor:pointer" onclick="closeModal('modalEditGambarSpec')"></i>
       </div>
       <div class="modal-body">
@@ -567,12 +567,12 @@
           <textarea class="form-control" id="editHeroImages" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://example.com/hero.jpg"></textarea>
         </div>
         <div class="form-group">
-          <label>🎨 Gallery & Varian <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Varian</code> per baris)</small></label>
-          <textarea class="form-control" id="editGallery" rows="4" placeholder="https://drive.google.com/file/d/.../view | Teak Wood 01&#10;https://drive.google.com/file/d/.../view | Oak Natural 02"></textarea>
+          <label>🎨 Varian Produk <small style="font-weight:400;color:#888">(Format: <code>URL | Keterangan/Nama Varian</code> per baris)</small></label>
+          <textarea class="form-control" id="editVarian" rows="4" placeholder="https://drive.google.com/file/d/.../view | Teak Wood 01&#10;https://drive.google.com/file/d/.../view | Oak Natural 02"></textarea>
         </div>
         <div class="form-group">
-          <label>🎨 Saran Warna / Sample <small style="font-weight:400;color:#888">(1 link gambar per baris)</small></label>
-          <textarea class="form-control" id="editSaranWarna" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://drive.google.com/file/d/.../view"></textarea>
+          <label>🖼️ Gallery Produk <small style="font-weight:400;color:#888">(1 link gambar per baris)</small></label>
+          <textarea class="form-control" id="editGallery" rows="3" placeholder="https://drive.google.com/file/d/.../view&#10;https://drive.google.com/file/d/.../view"></textarea>
         </div>
         <div class="form-group">
           <label>📋 Spesifikasi Produk <small style="font-weight:400;color:#888">(Ukuran, ketebalan, wear layer, isi/box, dll.)</small></label>
@@ -877,7 +877,7 @@
       return text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
     }
 
-    function parseGallery(text) {
+    function parseVarian(text) {
       if (!text) return [];
       return text.split('\n')
         .map(line => line.trim())
@@ -913,8 +913,8 @@
         .split(',').map(k => k.trim()).filter(k => k);
       
       const heroImages = parseImageUrls(document.getElementById('newProdukHero').value);
-      const gallery = parseGallery(document.getElementById('newProdukGallery').value);
-      const saranWarna = parseImageUrls(document.getElementById('newProdukSaranWarna').value);
+      const varian = parseVarian(document.getElementById('newProdukVarian').value);
+      const gallery = parseImageUrls(document.getElementById('newProdukGallery').value);
       const specs = document.getElementById('newProdukSpec').value.trim();
 
       if (!nama) { showToast('Nama produk wajib diisi!', 'error'); return; }
@@ -926,8 +926,8 @@
           prioritas: priority,
           masterKeywords,
           heroImages,
+          varian,
           gallery,
-          saranWarna,
           specs
         });
         if (res.success) {
@@ -937,8 +937,8 @@
           document.getElementById('newProdukDesc').value = '';
           document.getElementById('newProdukMasterKeywords').value = '';
           document.getElementById('newProdukHero').value = '';
+          document.getElementById('newProdukVarian').value = '';
           document.getElementById('newProdukGallery').value = '';
-          document.getElementById('newProdukSaranWarna').value = '';
           document.getElementById('newProdukSpec').value = '';
           loadProduk();
         } else {
@@ -969,8 +969,8 @@
       const sheetName = `PRODUK_${p.nama.replace(/\s+/g, '_').substring(0, 20)}`;
       document.getElementById('editProdukSheetName').value = sheetName;
       document.getElementById('editProdukHero').value = 'Memuat...';
+      document.getElementById('editProdukVarian').value = 'Memuat...';
       document.getElementById('editProdukGallery').value = 'Memuat...';
-      document.getElementById('editProdukSaranWarna').value = 'Memuat...';
       document.getElementById('editProdukSpec').value = 'Memuat...';
 
       openModal('modalEditProduk');
@@ -980,24 +980,24 @@
         const data = await apiGet('getProdukData', { sheetName });
         if (data && data.success) {
           const hero = data.heroImages || [];
-          const gallery = data.gallery || [];
-          const saran = data.saranWarna || [];
+          const varian = data.varian || data.galleryVarian || [];
+          const gallery = data.gallery || data.saranWarna || [];
           const specs = data.specs || '';
           document.getElementById('editProdukHero').value = Array.isArray(hero) ? hero.join('\n') : (hero || '');
-          document.getElementById('editProdukGallery').value = Array.isArray(gallery) ? 
-            gallery.map(g => typeof g === 'object' ? `${g.link}${g.ket ? ' | ' + g.ket : ''}` : g).join('\n') : (gallery || '');
-          document.getElementById('editProdukSaranWarna').value = Array.isArray(saran) ? saran.join('\n') : (saran || '');
+          document.getElementById('editProdukVarian').value = Array.isArray(varian) ? 
+            varian.map(v => typeof v === 'object' ? `${v.link}${v.ket ? ' | ' + v.ket : ''}` : v).join('\n') : (varian || '');
+          document.getElementById('editProdukGallery').value = Array.isArray(gallery) ? gallery.join('\n') : (gallery || '');
           document.getElementById('editProdukSpec').value = specs || '';
         } else {
           document.getElementById('editProdukHero').value = '';
+          document.getElementById('editProdukVarian').value = '';
           document.getElementById('editProdukGallery').value = '';
-          document.getElementById('editProdukSaranWarna').value = '';
           document.getElementById('editProdukSpec').value = '';
         }
       } catch(e) {
         document.getElementById('editProdukHero').value = '';
+        document.getElementById('editProdukVarian').value = '';
         document.getElementById('editProdukGallery').value = '';
-        document.getElementById('editProdukSaranWarna').value = '';
         document.getElementById('editProdukSpec').value = '';
       }
     }
@@ -1011,8 +1011,8 @@
       const status = document.getElementById('editProdukStatus').value;
 
       const heroImages = parseImageUrls(document.getElementById('editProdukHero').value);
-      const gallery = parseGallery(document.getElementById('editProdukGallery').value);
-      const saranWarna = parseImageUrls(document.getElementById('editProdukSaranWarna').value);
+      const varian = parseVarian(document.getElementById('editProdukVarian').value);
+      const gallery = parseImageUrls(document.getElementById('editProdukGallery').value);
       const specs = document.getElementById('editProdukSpec').value.trim();
 
       if (!nama) { showToast('Nama produk wajib diisi!', 'error'); return; }
@@ -1030,13 +1030,13 @@
           status,
           prioritas: priority,
           heroImages,
+          varian,
           gallery,
-          saranWarna,
           specs
         });
 
         if (sheetName) {
-          await apiPost('updateProdukData', { sheetName, heroImages, gallery, saranWarna, specs }).catch(() => {});
+          await apiPost('updateProdukData', { sheetName, heroImages, varian, gallery, specs }).catch(() => {});
         }
 
         showToast('Produk berhasil diupdate!', 'success');
@@ -1094,14 +1094,14 @@
       document.getElementById('editGambarSpecProdukNama').textContent = produkNama;
 
       const hero = currentProdukData?.heroImages || [];
-      const gallery = currentProdukData?.gallery || [];
-      const saran = currentProdukData?.saranWarna || [];
+      const varian = currentProdukData?.varian || currentProdukData?.galleryVarian || [];
+      const gallery = currentProdukData?.gallery || currentProdukData?.saranWarna || [];
       const specs = currentProdukData?.specs || '';
 
       document.getElementById('editHeroImages').value = Array.isArray(hero) ? hero.join('\n') : (hero || '');
-      document.getElementById('editGallery').value = Array.isArray(gallery) ? 
-        gallery.map(g => typeof g === 'object' ? `${g.link}${g.ket ? ' | ' + g.ket : ''}` : g).join('\n') : (gallery || '');
-      document.getElementById('editSaranWarna').value = Array.isArray(saran) ? saran.join('\n') : (saran || '');
+      document.getElementById('editVarian').value = Array.isArray(varian) ? 
+        varian.map(v => typeof v === 'object' ? `${v.link}${v.ket ? ' | ' + v.ket : ''}` : v).join('\n') : (varian || '');
+      document.getElementById('editGallery').value = Array.isArray(gallery) ? gallery.join('\n') : (gallery || '');
       document.getElementById('editSpecs').value = specs || '';
 
       openModal('modalEditGambarSpec');
@@ -1114,8 +1114,8 @@
       btn.innerHTML = '<div class="loading" style="width:14px;height:14px;border-width:2px"></div> Menyimpan...';
 
       const heroImages = parseImageUrls(document.getElementById('editHeroImages').value);
-      const gallery = parseGallery(document.getElementById('editGallery').value);
-      const saranWarna = parseImageUrls(document.getElementById('editSaranWarna').value);
+      const varian = parseVarian(document.getElementById('editVarian').value);
+      const gallery = parseImageUrls(document.getElementById('editGallery').value);
       const specs = document.getElementById('editSpecs').value.trim();
 
       try {
@@ -1123,8 +1123,8 @@
           sheetName: currentProdukSheet,
           produkId: currentProdukId,
           heroImages,
+          varian,
           gallery,
-          saranWarna,
           specs
         });
 
@@ -1133,13 +1133,13 @@
             id: currentProdukId,
             sheetName: currentProdukSheet,
             heroImages,
+            varian,
             gallery,
-            saranWarna,
             specs
           }).catch(() => {});
         }
 
-        showToast('Gambar & Spesifikasi berhasil disimpan!', 'success');
+        showToast('Gambar, Varian & Spesifikasi berhasil disimpan!', 'success');
         closeModal('modalEditGambarSpec');
         loadKeywordData();
       } catch(e) {
@@ -1174,15 +1174,15 @@
     function renderImagePanel(data) {
       const panel = document.getElementById('imagePanel');
       const hero = data.heroImages || [];
-      const gallery = (data.gallery || []).map(g => {
-        if (typeof g === 'object' && g !== null) return g;
-        if (typeof g === 'string') {
-          const parts = g.split('|');
+      const varian = (data.varian || data.galleryVarian || []).map(v => {
+        if (typeof v === 'object' && v !== null) return v;
+        if (typeof v === 'string') {
+          const parts = v.split('|');
           return { link: parts[0].trim(), ket: parts.slice(1).join('|').trim() };
         }
         return { link: '', ket: '' };
       });
-      const saran = data.saranWarna || [];
+      const gallery = data.gallery || data.saranWarna || [];
       
       panel.innerHTML = `
         <div style="margin-bottom:20px">
@@ -1194,32 +1194,32 @@
               <div class="image-item" title="${url}">
                 <img src="${formatDriveThumbnail(url)}" alt="Hero Image" onerror="this.parentElement.style.opacity='0.3'">
               </div>
-            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada gambar</span>'}
+            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada gambar hero</span>'}
           </div>
         </div>
         <div style="margin-bottom:20px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-            <h4 style="font-size:14px;color:var(--text-sec)">🎨 Gallery (${gallery.length})</h4>
+            <h4 style="font-size:14px;color:var(--text-sec)">🎨 Varian (${varian.length})</h4>
           </div>
           <div class="image-grid">
-            ${gallery.map(g => `
-              <div class="image-item" title="${g.ket || g.link}">
-                <img src="${formatDriveThumbnail(g.link)}" alt="${g.ket || 'Gallery'}" onerror="this.parentElement.style.opacity='0.3'">
-                <div class="name">${g.ket || 'Variant'}</div>
+            ${varian.map(v => `
+              <div class="image-item" title="${v.ket || v.link}">
+                <img src="${formatDriveThumbnail(v.link)}" alt="${v.ket || 'Varian'}" onerror="this.parentElement.style.opacity='0.3'">
+                <div class="name">${v.ket || 'Variant'}</div>
               </div>
-            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada gallery</span>'}
+            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada varian</span>'}
           </div>
         </div>
         <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-            <h4 style="font-size:14px;color:var(--text-sec)">🎨 Saran Warna (${saran.length})</h4>
+            <h4 style="font-size:14px;color:var(--text-sec)">🖼️ Gallery (${gallery.length})</h4>
           </div>
           <div class="image-grid">
-            ${saran.map(url => `
+            ${gallery.map(url => `
               <div class="image-item" title="${url}">
-                <img src="${formatDriveThumbnail(url)}" alt="Saran Warna" onerror="this.parentElement.style.opacity='0.3'">
+                <img src="${formatDriveThumbnail(url)}" alt="Gallery" onerror="this.parentElement.style.opacity='0.3'">
               </div>
-            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada saran warna</span>'}
+            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada gallery</span>'}
           </div>
         </div>
       `;
