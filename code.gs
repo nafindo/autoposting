@@ -125,12 +125,24 @@ function getConfig() {
   
   const data = sheet.getDataRange().getValues();
   const config = { ...DEFAULT_CONFIG };
+  const numFields = ['MAX_POST_PER_DAY', 'JAM_AKTIF_MULAI', 'JAM_AKTIF_SELESAI', 'TRIGGER_INTERVAL_MINUTES', 'KEYWORD_REFRESH_HOUR', 'MIN_DELAY_MINUTES', 'MAX_DELAY_MINUTES', 'POSTS_PER_BATCH'];
+
   for (let i = 1; i < data.length; i++) {
+    const key = String(data[i][0] || '').trim();
     let val = data[i][1];
-    if (!isNaN(val) && val !== '' && typeof val === 'string') val = Number(val);
-    config[data[i][0]] = val;
+    if (numFields.includes(key) && !isNaN(val) && val !== '') {
+      val = Number(val);
+    } else {
+      val = String(val || '').trim();
+    }
+    config[key] = val;
   }
   
+  // Perbaiki Blog ID jika terpotong akibat format angka
+  if (config.BLOG_ID === '5323802325028284000' || !config.BLOG_ID) {
+    config.BLOG_ID = DEFAULT_CONFIG.BLOG_ID || '5323802325028284266';
+  }
+
   if (!config.GROQ_MODEL || config.GROQ_MODEL.toLowerCase() === 'groq' || !config.GROQ_MODEL.includes('/')) {
     config.GROQ_MODEL = 'openai/gpt-oss-120b';
   }
@@ -148,7 +160,14 @@ function saveConfig(configObj) {
   
   sheet.clear();
   sheet.appendRow(['Key', 'Value']);
-  Object.entries(configObj).forEach(([k, v]) => sheet.appendRow([k, v]));
+  Object.entries(configObj).forEach(([k, v]) => {
+    // Tulis sebagai plain text jika ID atau nomor WA
+    if (k === 'BLOG_ID' || k === 'WHATSAPP_NUMBER' || k === 'SPREADSHEET_ID') {
+      sheet.appendRow([k, "'" + String(v).replace(/^'+/, '')]);
+    } else {
+      sheet.appendRow([k, v]);
+    }
+  });
   
   return { success: true };
 }
@@ -1431,26 +1450,41 @@ function getImageUrlFromLink(url) {
 
 function authorizeBlogger() {
   const config = getConfig();
-  console.log("Memeriksa otorisasi Blogger untuk Blog ID: " + config.BLOG_ID);
+  const blogId = String(config.BLOG_ID || '5323802325028284266').trim();
+  console.log("=== MEMULAI TEST OTORISASI BLOGGER ===");
+  console.log("Blog ID: " + blogId);
   
+  // 1. Tes melalui Advanced Blogger Service (jika diaktifkan di menu Services +)
   if (typeof Blogger !== 'undefined' && Blogger.Blogs && Blogger.Blogs.get) {
     try {
-      const blog = Blogger.Blogs.get(String(config.BLOG_ID));
-      console.log("Blogger Service terhubung ke blog: " + (blog ? blog.name : 'OK'));
-      return { success: true, blogName: blog ? blog.name : 'OK' };
+      const blog = Blogger.Blogs.get(blogId);
+      console.log("SUKSES: Terhubung via Blogger Advanced Service!");
+      console.log("Nama Blog: " + (blog ? blog.name : 'OK'));
+      console.log("URL Blog: " + (blog ? blog.url : 'OK'));
+      return { success: true, via: 'Advanced Service', blogName: blog ? blog.name : 'OK' };
     } catch(e) {
-      console.warn("Blogger service check: " + e);
+      console.warn("Blogger Advanced Service: " + e);
     }
   }
   
-  const url = `https://www.googleapis.com/blogger/v3/blogs/${config.BLOG_ID}`;
+  // 2. Tes melalui UrlFetchApp REST API
+  const url = `https://www.googleapis.com/blogger/v3/blogs/${blogId}`;
   const res = UrlFetchApp.fetch(url, {
     method: 'get',
     headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() },
     muteHttpExceptions: true
   });
   
-  console.log("Status: " + res.getResponseCode());
-  console.log("Response: " + res.getContentText());
-  return { success: res.getResponseCode() === 200, code: res.getResponseCode(), text: res.getContentText() };
+  const code = res.getResponseCode();
+  const text = res.getContentText();
+  console.log("HTTP Response Code: " + code);
+  
+  if (code === 200) {
+    const json = JSON.parse(text);
+    console.log("SUKSES: Terhubung via REST API ke Blog: " + json.name + " (" + json.url + ")");
+    return { success: true, via: 'REST API', blogName: json.name, blogUrl: json.url };
+  } else {
+    console.error("GAGAL: " + text);
+    return { success: false, code: code, text: text };
+  }
 }
