@@ -47,6 +47,7 @@ function doGet(e) {
       case 'previewPost': result = previewPost(e.parameter.produk, e.parameter.keyword, parseInt(e.parameter.row)); break;
       case 'getMasterKeywords': result = getMasterKeywords(e.parameter.produkId); break;
       case 'getQueueStatus': result = getQueueStatus(); break;
+      case 'checkBloggerAuth': result = authorizeBlogger(); break;
     }
   } catch(err) {
     result = { success: false, error: err.toString() };
