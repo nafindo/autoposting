@@ -1428,3 +1428,29 @@ function getImageUrlFromLink(url) {
   }
   return url;
 }
+
+function authorizeBlogger() {
+  const config = getConfig();
+  console.log("Memeriksa otorisasi Blogger untuk Blog ID: " + config.BLOG_ID);
+  
+  if (typeof Blogger !== 'undefined' && Blogger.Blogs && Blogger.Blogs.get) {
+    try {
+      const blog = Blogger.Blogs.get(String(config.BLOG_ID));
+      console.log("Blogger Service terhubung ke blog: " + (blog ? blog.name : 'OK'));
+      return { success: true, blogName: blog ? blog.name : 'OK' };
+    } catch(e) {
+      console.warn("Blogger service check: " + e);
+    }
+  }
+  
+  const url = `https://www.googleapis.com/blogger/v3/blogs/${config.BLOG_ID}`;
+  const res = UrlFetchApp.fetch(url, {
+    method: 'get',
+    headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() },
+    muteHttpExceptions: true
+  });
+  
+  console.log("Status: " + res.getResponseCode());
+  console.log("Response: " + res.getContentText());
+  return { success: res.getResponseCode() === 200, code: res.getResponseCode(), text: res.getContentText() };
+}
