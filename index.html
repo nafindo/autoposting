@@ -83,9 +83,13 @@
     .progress-bar{background:#e8f0fe;height:8px;border-radius:4px;overflow:hidden;margin-top:8px}
     .progress-fill{background:var(--primary);height:100%;border-radius:4px;transition:width .3s}
     .loading{display:inline-block;width:20px;height:20px;border:3px solid #f3f3f3;border-top:3px solid var(--primary);border-radius:50%;animation:spin 1s linear infinite}
-    @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
     .tag{display:inline-flex;align-items:center;padding:4px 10px;background:#e8f0fe;color:var(--primary);border-radius:20px;font-size:12px;margin:2px}
     .tag .remove{margin-left:6px;cursor:pointer;font-weight:700}
+    .tag-badge{display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:#fff;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;margin:2px}
+    .tag-badge .remove-tag{cursor:pointer;font-weight:700;font-size:14px;opacity:0.8;line-height:1}
+    .tag-badge .remove-tag:hover{opacity:1}
+    .existing-label-pill{cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#e8f0fe;color:#1a73e8;padding:3px 8px;border-radius:15px;font-size:12px;border:1px solid #d2e3fc;transition:all .2s ease;user-select:none}
+    .existing-label-pill:hover{background:#d2e3fc;transform:translateY(-1px)}
     @media(max-width:768px){.sidebar{width:100%;position:relative;height:auto}.main{margin-left:0}.form-row{grid-template-columns:1fr}}
   </style>
 </head>
@@ -192,7 +196,7 @@
 
       <!-- PRODUK -->
       <div id="produk" class="section">
-        <div class="header"><h2>Manajemen Produk</h2><button class="btn btn-primary" onclick="openModal('modalProduk')"><i class="fas fa-plus"></i> Tambah Produk</button></div>
+        <div class="header"><h2>Manajemen Produk</h2><button class="btn btn-primary" onclick="openModalProduk()"><i class="fas fa-plus"></i> Tambah Produk</button></div>
         <div class="card">
           <div class="card-body">
             <div class="table-wrap">
@@ -454,6 +458,16 @@
             <label>Prioritas Posting (1-10, 1=paling tinggi)</label>
             <input type="number" class="form-control" id="newProdukPriority" value="5" min="1" max="10">
           </div>
+          <div class="form-group">
+            <label>🏷️ Label / Kategori Blogger <small style="font-weight:400;color:#888">(digunakan sebagai label postingan)</small></label>
+            <div id="newProdukLabelsContainer" class="tag-container" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:36px;padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></div>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="text" class="form-control" id="newProdukLabelInput" placeholder="Ketik label baru lalu tekan Enter / Tambah..." onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('newProdukLabelsContainer', this);}">
+              <button class="btn btn-outline btn-sm" type="button" onclick="addTagFromInput('newProdukLabelsContainer', document.getElementById('newProdukLabelInput'))"><i class="fas fa-plus"></i> Tambah</button>
+            </div>
+            <div style="font-size:12px;color:var(--text-sec);margin-bottom:4px;">Pilih cepat dari label yang sudah ada:</div>
+            <div id="newProdukExistingLabels" class="existing-labels" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+          </div>
         </div>
 
         <!-- Tab 2: Gambar & Varian Produk -->
@@ -525,6 +539,16 @@
               <label>Prioritas (1-10)</label>
               <input type="number" class="form-control" id="editProdukPriority" min="1" max="10">
             </div>
+          </div>
+          <div class="form-group">
+            <label>🏷️ Label / Kategori Blogger <small style="font-weight:400;color:#888">(digunakan sebagai label postingan)</small></label>
+            <div id="editProdukLabelsContainer" class="tag-container" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:36px;padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></div>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="text" class="form-control" id="editProdukLabelInput" placeholder="Ketik label baru lalu tekan Enter / Tambah..." onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('editProdukLabelsContainer', this);}">
+              <button class="btn btn-outline btn-sm" type="button" onclick="addTagFromInput('editProdukLabelsContainer', document.getElementById('editProdukLabelInput'))"><i class="fas fa-plus"></i> Tambah</button>
+            </div>
+            <div style="font-size:12px;color:var(--text-sec);margin-bottom:4px;">Pilih cepat dari label yang sudah ada:</div>
+            <div id="editProdukExistingLabels" class="existing-labels" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
           </div>
         </div>
 
@@ -866,12 +890,98 @@
       } catch(e) {}
     }
 
-    // ==================== PRODUK ====================
+    // ==================== PRODUK & TAGS ====================
+    let allExistingLabels = [];
+
+    async function loadAllLabels() {
+      try {
+        const res = await apiGet('getAllLabels');
+        if (res && res.labels) {
+          allExistingLabels = res.labels;
+        }
+      } catch(e) {}
+    }
+
+    function renderExistingLabels(containerId, targetTagContainerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      if (!allExistingLabels || allExistingLabels.length === 0) {
+        container.innerHTML = '<small style="color:#999">Belum ada label lain</small>';
+        return;
+      }
+      container.innerHTML = allExistingLabels.map(l => `
+        <span class="existing-label-pill" onclick="addTag('${targetTagContainerId}', '${l.replace(/'/g, "\\'")}')">
+          <i class="fas fa-plus" style="font-size:10px"></i> ${l}
+        </span>
+      `).join('');
+    }
+
+    function addTag(containerId, text) {
+      text = String(text || '').trim();
+      if (!text) return;
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      
+      const existingTags = getTags(containerId);
+      if (existingTags.some(t => t.toLowerCase() === text.toLowerCase())) return;
+      
+      const span = document.createElement('span');
+      span.className = 'tag-badge';
+      span.dataset.value = text;
+      span.innerHTML = `<span>${text}</span> <span class="remove-tag" onclick="this.parentElement.remove()">&times;</span>`;
+      container.appendChild(span);
+    }
+
+    function addTagFromInput(containerId, inputEl) {
+      if (!inputEl) return;
+      const val = inputEl.value.trim();
+      if (val) {
+        val.split(',').forEach(t => addTag(containerId, t.trim()));
+        inputEl.value = '';
+      }
+    }
+
+    function getTags(containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return [];
+      const tags = [];
+      container.querySelectorAll('.tag-badge').forEach(b => {
+        if (b.dataset.value) tags.push(b.dataset.value);
+      });
+      return tags;
+    }
+
+    function setTags(containerId, tagsArr) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = '';
+      if (!tagsArr) return;
+      const arr = Array.isArray(tagsArr) ? tagsArr : String(tagsArr).split(',').map(s => s.trim()).filter(Boolean);
+      arr.forEach(t => addTag(containerId, t));
+    }
+
+    function openModalProduk() {
+      document.getElementById('newProdukNama').value = '';
+      document.getElementById('newProdukDesc').value = '';
+      document.getElementById('newProdukMasterKeywords').value = '';
+      document.getElementById('newProdukPriority').value = 5;
+      document.getElementById('newProdukHero').value = '';
+      document.getElementById('newProdukVarian').value = '';
+      document.getElementById('newProdukGallery').value = '';
+      document.getElementById('newProdukSpec').value = '';
+      document.getElementById('newProdukLabelInput').value = '';
+      setTags('newProdukLabelsContainer', ['Katalog Jualan']);
+      renderExistingLabels('newProdukExistingLabels', 'newProdukLabelsContainer');
+      openModal('modalProduk');
+      switchModalTab('modalProduk', 'info', document.querySelector('#modalProduk .tab'));
+    }
+
     async function loadProduk() {
       try {
         const res = await apiGet('getProdukList');
         produkList = res.data || [];
         renderProdukTable(produkList);
+        loadAllLabels();
       } catch(e) { showToast('Gagal memuat produk', 'error'); }
     }
 
@@ -881,9 +991,14 @@
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999">Belum ada produk</td></tr>';
         return;
       }
-      tbody.innerHTML = data.map(p => `
+      tbody.innerHTML = data.map(p => {
+        const lbls = p.labels ? String(p.labels).split(',').map(l => l.trim()).filter(Boolean) : [];
+        return `
         <tr>
-          <td><strong>${p.nama}</strong></td>
+          <td>
+            <strong>${p.nama}</strong>
+            ${lbls.length > 0 ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${lbls.map(l => `<span style="font-size:11px;background:#e8f0fe;color:#1a73e8;padding:2px 6px;border-radius:10px;">🏷️ ${l}</span>`).join('')}</div>` : ''}
+          </td>
           <td><span class="badge badge-info">Auto-generate</span></td>
           <td>${p.prioritas}</td>
           <td><span class="badge ${p.status === 'Aktif' ? 'badge-success' : 'badge-gray'}">${p.status}</span></td>
@@ -892,7 +1007,7 @@
             <button class="btn btn-danger btn-sm" onclick="deleteProduk('${p.id}')"><i class="fas fa-trash"></i></button>
           </td>
         </tr>
-      `).join('');
+      `}).join('');
     }
 
     // ==================== MODAL TAB SWITCHER ====================
@@ -946,6 +1061,7 @@
       const masterKeywords = document.getElementById('newProdukMasterKeywords').value
         .split(',').map(k => k.trim()).filter(k => k);
       
+      const labels = getTags('newProdukLabelsContainer');
       const heroImages = parseImageUrls(document.getElementById('newProdukHero').value);
       const varian = parseVarian(document.getElementById('newProdukVarian').value);
       const gallery = parseImageUrls(document.getElementById('newProdukGallery').value);
@@ -959,6 +1075,7 @@
           deskripsi: desc,
           prioritas: priority,
           masterKeywords,
+          labels,
           heroImages,
           varian,
           gallery,
@@ -967,13 +1084,6 @@
         if (res.success) {
           showToast(`Produk ditambahkan! ${res.sheetName || nama} + 50 keyword auto-generated`, 'success');
           closeModal('modalProduk');
-          document.getElementById('newProdukNama').value = '';
-          document.getElementById('newProdukDesc').value = '';
-          document.getElementById('newProdukMasterKeywords').value = '';
-          document.getElementById('newProdukHero').value = '';
-          document.getElementById('newProdukVarian').value = '';
-          document.getElementById('newProdukGallery').value = '';
-          document.getElementById('newProdukSpec').value = '';
           loadProduk();
         } else {
           showToast('Gagal menambah produk: ' + (res.error || 'Unknown error'), 'error');
@@ -999,6 +1109,10 @@
       document.getElementById('editProdukDesc').value = p.deskripsi || '';
       document.getElementById('editProdukPriority').value = p.prioritas || 5;
       document.getElementById('editProdukStatus').value = p.status || 'Aktif';
+      document.getElementById('editProdukLabelInput').value = '';
+
+      setTags('editProdukLabelsContainer', p.labels || '');
+      renderExistingLabels('editProdukExistingLabels', 'editProdukLabelsContainer');
 
       const sheetName = `PRODUK_${p.nama.replace(/\s+/g, '_').substring(0, 20)}`;
       document.getElementById('editProdukSheetName').value = sheetName;
@@ -1013,6 +1127,9 @@
       try {
         const data = await apiGet('getProdukData', { sheetName });
         if (data && data.success) {
+          if (data.labels && getTags('editProdukLabelsContainer').length === 0) {
+            setTags('editProdukLabelsContainer', data.labels);
+          }
           const hero = data.heroImages || [];
           const varian = data.varian || data.galleryVarian || [];
           const gallery = data.gallery || data.saranWarna || [];
@@ -1043,6 +1160,7 @@
       const desc = document.getElementById('editProdukDesc').value.trim();
       const priority = parseInt(document.getElementById('editProdukPriority').value) || 5;
       const status = document.getElementById('editProdukStatus').value;
+      const labels = getTags('editProdukLabelsContainer');
 
       const heroImages = parseImageUrls(document.getElementById('editProdukHero').value);
       const varian = parseVarian(document.getElementById('editProdukVarian').value);
@@ -1063,6 +1181,7 @@
           deskripsi: desc,
           status,
           prioritas: priority,
+          labels,
           heroImages,
           varian,
           gallery,

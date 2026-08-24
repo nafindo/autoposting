@@ -48,6 +48,7 @@ function doGet(e) {
       case 'getMasterKeywords': result = getMasterKeywords(e.parameter.produkId); break;
       case 'getQueueStatus': result = getQueueStatus(); break;
       case 'checkBloggerAuth': result = authorizeBlogger(); break;
+      case 'getAllLabels': result = { success: true, labels: getAllLabels() }; break;
     }
   } catch(err) {
     result = { success: false, error: err.toString() };
@@ -68,8 +69,8 @@ function doPost(e) {
     
     switch(action) {
       case 'saveConfig': result = saveConfig(data.config); break;
-      case 'addProduk': result = addProduk(data.nama, data.deskripsi, data.prioritas, data.masterKeywords, data.heroImages, data.varian || data.galleryVarian, data.gallery || data.saranWarna, data.specs); break;
-      case 'updateProduk': result = updateProduk(data.id, data.nama, data.deskripsi, data.status, data.prioritas, data.heroImages, data.varian || data.galleryVarian, data.gallery || data.saranWarna, data.specs, data.sheetName); break;
+      case 'addProduk': result = addProduk(data.nama, data.deskripsi, data.prioritas, data.masterKeywords, data.heroImages, data.varian || data.galleryVarian, data.gallery || data.saranWarna, data.specs, data.labels); break;
+      case 'updateProduk': result = updateProduk(data.id, data.nama, data.deskripsi, data.status, data.prioritas, data.heroImages, data.varian || data.galleryVarian, data.gallery || data.saranWarna, data.specs, data.sheetName, data.labels); break;
       case 'updateProdukData': result = updateProdukData(data.sheetName, data.heroImages, data.varian || data.galleryVarian, data.gallery || data.saranWarna, data.specs); break;
       case 'deleteProduk': result = deleteProduk(data.id); break;
       case 'addKeyword': result = addKeyword(data.sheetName, data.keyword, data.label, data.spec); break;
@@ -299,9 +300,11 @@ function generateKeywordsFromMaster(produkId, count) {
   
   const produkData = produkSheet.getDataRange().getValues();
   let produkNama = '';
+  let defaultLabel = '';
   for (let i = 1; i < produkData.length; i++) {
     if (produkData[i][0] === produkId) {
       produkNama = produkData[i][1];
+      defaultLabel = produkData[i][6] || '';
       break;
     }
   }
@@ -339,7 +342,7 @@ function generateKeywordsFromMaster(produkId, count) {
   let added = 0;
   newKeywords.forEach(kw => {
     if (!existingKeywords.has(kw.toLowerCase().trim())) {
-      targetSheet.appendRow([kw, '', '', '', '', '', '', '', '', '', '']);
+      targetSheet.appendRow([kw, '', '', '', '', defaultLabel || '', '', '', '', '', '']);
       existingKeywords.add(kw.toLowerCase().trim());
       added++;
     }
@@ -494,23 +497,28 @@ function getProdukList() {
       deskripsi: data[i][2],
       status: data[i][3] || 'Aktif',
       prioritas: data[i][4] || 5,
-      created: data[i][5] || ''
+      created: data[i][5] || '',
+      labels: data[i][6] || ''
     });
   }
   return produk;
 }
 
-function addProduk(nama, deskripsi, prioritas, masterKeywords, heroImages, varian, gallery, specs) {
+function addProduk(nama, deskripsi, prioritas, masterKeywords, heroImages, varian, gallery, specs, labels) {
   const ss = getSS();
   
   let sheet = ss.getSheetByName('MASTER_PRODUK');
   if (!sheet) {
     sheet = ss.insertSheet('MASTER_PRODUK');
-    sheet.appendRow(['ID', 'Nama', 'Deskripsi', 'Status', 'Prioritas', 'Created']);
+    sheet.appendRow(['ID', 'Nama', 'Deskripsi', 'Status', 'Prioritas', 'Created', 'Labels']);
+  } else if (sheet.getMaxColumns() < 7) {
+    sheet.insertColumnAfter(sheet.getMaxColumns());
+    sheet.getRange(1, 7).setValue('Labels');
   }
   
   const id = 'PRD_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMddHHmmss');
-  sheet.appendRow([id, nama, deskripsi || '', 'Aktif', prioritas || 5, new Date()]);
+  const labelStr = Array.isArray(labels) ? labels.join(', ') : String(labels || '').trim();
+  sheet.appendRow([id, nama, deskripsi || '', 'Aktif', prioritas || 5, new Date(), labelStr]);
   
   // Simpan master keywords
   if (masterKeywords && masterKeywords.length > 0) {
@@ -538,11 +546,18 @@ function addProduk(nama, deskripsi, prioritas, masterKeywords, heroImages, varia
   return { success: true, id, sheetName };
 }
 
-function updateProduk(id, nama, deskripsi, status, prioritas, heroImages, varian, gallery, specs, sheetName) {
+function updateProduk(id, nama, deskripsi, status, prioritas, heroImages, varian, gallery, specs, sheetName, labels) {
   const ss = getSS();
   const sheet = ss.getSheetByName('MASTER_PRODUK');
   if (!sheet) return { success: false, error: 'Sheet MASTER_PRODUK tidak ditemukan' };
   
+  if (sheet.getMaxColumns() < 7) {
+    sheet.insertColumnAfter(sheet.getMaxColumns());
+    sheet.getRange(1, 7).setValue('Labels');
+  }
+
+  const labelStr = labels !== undefined ? (Array.isArray(labels) ? labels.join(', ') : String(labels || '').trim()) : undefined;
+
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]) === String(id)) {
@@ -550,6 +565,7 @@ function updateProduk(id, nama, deskripsi, status, prioritas, heroImages, varian
       if (deskripsi !== undefined) sheet.getRange(i + 1, 3).setValue(deskripsi);
       if (status) sheet.getRange(i + 1, 4).setValue(status);
       if (prioritas !== undefined) sheet.getRange(i + 1, 5).setValue(prioritas);
+      if (labelStr !== undefined) sheet.getRange(i + 1, 7).setValue(labelStr);
       
       const targetSheet = sheetName || ('PRODUK_' + (nama || data[i][1]).replace(/\s+/g, '_').substring(0, 20));
       if (heroImages || varian || gallery || specs) {
@@ -689,9 +705,28 @@ function getProdukData(sheetName) {
     if (data[i][9]) gallery.push(...parseLinks(data[i][9]));
   }
   
+  // Cari label produk dari MASTER_PRODUK
+  let prodLabels = '';
+  const mSheet = ss.getSheetByName('MASTER_PRODUK');
+  if (mSheet) {
+    const mData = mSheet.getDataRange().getValues();
+    const cleanSheetName = sheetName.replace(/^PRODUK_/, '').toLowerCase();
+    for (let i = 1; i < mData.length; i++) {
+      const pName = String(mData[i][1] || '').replace(/\s+/g, '_').substring(0, 20).toLowerCase();
+      if (pName === cleanSheetName || String(mData[i][1]).toLowerCase() === cleanSheetName) {
+        prodLabels = mData[i][6] || '';
+        break;
+      }
+    }
+  }
+  if (!prodLabels && data.length > 1 && data[1][5]) {
+    prodLabels = data[1][5];
+  }
+
   return {
     success: true,
     keywords,
+    labels: prodLabels,
     heroImages: [...new Set(heroImages)],
     specs: [...new Set(specs)].join('\n'),
     varian,
@@ -699,6 +734,42 @@ function getProdukData(sheetName) {
     galleryVarian: varian,
     saranWarna: [...new Set(gallery)]
   };
+}
+
+function getAllLabels() {
+  const ss = getSS();
+  const labelSet = new Set(['Katalog Jualan']);
+  
+  // Ambil dari MASTER_PRODUK
+  const mSheet = ss.getSheetByName('MASTER_PRODUK');
+  if (mSheet) {
+    const mData = mSheet.getDataRange().getValues();
+    for (let i = 1; i < mData.length; i++) {
+      if (mData[i][1]) labelSet.add(String(mData[i][1]).trim());
+      if (mData[i][6]) {
+        String(mData[i][6]).split(',').forEach(l => {
+          if (l.trim()) labelSet.add(l.trim());
+        });
+      }
+    }
+  }
+  
+  // Ambil dari setiap sheet PRODUK_
+  const sheets = ss.getSheets();
+  sheets.forEach(s => {
+    if (s.getName().startsWith('PRODUK_')) {
+      const data = s.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][5]) {
+          String(data[i][5]).split(',').forEach(l => {
+            if (l.trim()) labelSet.add(l.trim());
+          });
+        }
+      }
+    }
+  });
+  
+  return Array.from(labelSet).filter(Boolean);
 }
 
 function addKeyword(sheetName, keyword, label, spec) {
@@ -1072,7 +1143,10 @@ function buatPostinganOtomatis() {
         }
       }
     }
-    const labels = labelRaw ? String(labelRaw).split(',').map(l => l.trim()) : ['Katalog Jualan'];
+    if (!labelRaw && pData.labels) {
+      labelRaw = pData.labels;
+    }
+    const labels = labelRaw ? String(labelRaw).split(',').map(l => l.trim()).filter(Boolean) : [item.produkNama, 'Katalog Jualan'];
     
     const heroLink = pData.heroImages[Math.floor(Math.random() * pData.heroImages.length)];
     const heroThumb = getImageUrlFromLink(heroLink);
@@ -1132,7 +1206,10 @@ function postManual(produkNama, keyword, row) {
       }
     }
   }
-  const labels = labelRaw ? String(labelRaw).split(',').map(l => l.trim()) : ['Katalog Jualan'];
+  if (!labelRaw && pData.labels) {
+    labelRaw = pData.labels;
+  }
+  const labels = labelRaw ? String(labelRaw).split(',').map(l => l.trim()).filter(Boolean) : [produkNama, 'Katalog Jualan'];
   
   const heroLink = (pData.heroImages && pData.heroImages.length > 0)
     ? pData.heroImages[Math.floor(Math.random() * pData.heroImages.length)]
