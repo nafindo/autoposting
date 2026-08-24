@@ -124,12 +124,17 @@ function getConfig() {
   }
   
   const data = sheet.getDataRange().getValues();
-  const config = {};
+  const config = { ...DEFAULT_CONFIG };
   for (let i = 1; i < data.length; i++) {
     let val = data[i][1];
     if (!isNaN(val) && val !== '' && typeof val === 'string') val = Number(val);
     config[data[i][0]] = val;
   }
+  
+  if (!config.GROQ_MODEL || config.GROQ_MODEL.toLowerCase() === 'groq' || !config.GROQ_MODEL.includes('/')) {
+    config.GROQ_MODEL = 'openai/gpt-oss-120b';
+  }
+
   return config;
 }
 
@@ -1226,7 +1231,15 @@ function getDriveImages(folderId) {
 function getAIDescription(nama, kw, tipe, spec) {
   const config = getConfig();
   const apiKey = getAIKeyRotation();
+  if (!apiKey) {
+    console.error('AI Error: Tidak ada Groq API Key yang aktif.');
+    return null;
+  }
+  
   const url = 'https://api.groq.com/openai/v1/chat/completions';
+  const model = (config.GROQ_MODEL && config.GROQ_MODEL.toLowerCase() !== 'groq' && config.GROQ_MODEL.includes('/')) 
+    ? config.GROQ_MODEL 
+    : 'openai/gpt-oss-120b';
   
   const prompt = `Buat konten penawaran produk profesional.
 
@@ -1250,7 +1263,7 @@ OUTPUT JSON:
       method: 'post', contentType: 'application/json',
       headers: { 'Authorization': 'Bearer ' + apiKey },
       payload: JSON.stringify({
-        model: config.GROQ_MODEL,
+        model: model,
         messages: [
           { role: 'system', content: 'Kamu penulis konten marketing profesional Indonesia. Return JSON valid.' },
           { role: 'user', content: prompt }
@@ -1261,8 +1274,12 @@ OUTPUT JSON:
       muteHttpExceptions: true
     });
     
-    const json = JSON.parse(res.getContentText());
-    if (!json.choices || !json.choices[0]?.message?.content) return null;
+    const text = res.getContentText();
+    const json = JSON.parse(text);
+    if (!json.choices || !json.choices[0]?.message?.content) {
+      console.error('Groq API Error (' + res.getResponseCode() + '): ' + text);
+      return null;
+    }
     return JSON.parse(json.choices[0].message.content);
   } catch(e) {
     console.error('AI Error: ' + e);

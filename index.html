@@ -393,7 +393,16 @@
           <div class="card-body">
             <div class="form-row">
               <div class="form-group"><label>Max Post/Hari</label><input type="number" class="form-control" id="cfgMaxPost" min="1" max="50"></div>
-              <div class="form-group"><label>Model AI</label><input type="text" class="form-control" id="cfgModel"></div>
+              <div class="form-group">
+                <label>Model AI</label>
+                <select class="form-control" id="cfgModel">
+                  <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Recommended)</option>
+                  <option value="openai/gpt-oss-20b">openai/gpt-oss-20b (Fast)</option>
+                  <option value="groq/compound">groq/compound</option>
+                  <option value="groq/compound-mini">groq/compound-mini</option>
+                  <option value="qwen/qwen3.6-27b">qwen/qwen3.6-27b</option>
+                </select>
+              </div>
             </div>
             <div class="form-row">
               <div class="form-group"><label>Jam Aktif Mulai</label><input type="number" class="form-control" id="cfgJamMulai" min="0" max="23"></div>
@@ -1482,7 +1491,7 @@
         document.getElementById('cfgSheetId').value = cfg.SPREADSHEET_ID || '';
         document.getElementById('cfgBlogId').value = cfg.BLOG_ID || '';
         document.getElementById('cfgMaxPost').value = cfg.MAX_POST_PER_DAY || 40;
-        document.getElementById('cfgModel').value = cfg.GROQ_MODEL || '';
+        document.getElementById('cfgModel').value = (!cfg.GROQ_MODEL || cfg.GROQ_MODEL === 'Groq') ? 'openai/gpt-oss-120b' : cfg.GROQ_MODEL;
         document.getElementById('cfgJamMulai').value = cfg.JAM_AKTIF_MULAI || 8;
         document.getElementById('cfgJamSelesai').value = cfg.JAM_AKTIF_SELESAI || 22;
         document.getElementById('cfgInterval').value = cfg.TRIGGER_INTERVAL_MINUTES || 36;
