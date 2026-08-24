@@ -508,13 +508,15 @@
           document.getElementById('stQueue').textContent = stats.queued;
           document.getElementById('stProdukAktif').textContent = stats.totalProduk;
           updateTriggerUI(stats.triggerAktif, stats.dalamJamAktif, stats.jamSekarang);
+        } else {
+          showToast('API Error: ' + (stats.error || 'Unknown error'), 'error');
         }
         loadDailyStats();
         loadWeeklyStats();
         loadMonthlyStats();
         loadQueueStatus();
       } catch(e) {
-        showToast('Gagal memuat dashboard', 'error');
+        showToast('Gagal memuat dashboard: ' + e.message, 'error');
       }
     }
 
