@@ -56,11 +56,15 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  const data = JSON.parse(e.postData.contents);
-  const action = data.action;
   let result = { success: false, error: 'Unknown action' };
   
   try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse({ success: false, error: 'No POST data received' });
+    }
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+    
     switch(action) {
       case 'saveConfig': result = saveConfig(data.config); break;
       case 'addProduk': result = addProduk(data.nama, data.deskripsi, data.prioritas, data.masterKeywords, data.heroImages, data.varian || data.galleryVarian, data.gallery || data.saranWarna, data.specs); break;
@@ -80,6 +84,7 @@ function doPost(e) {
       case 'saveMasterKeywords': result = saveMasterKeywords(data.produkId, data.keywords); break;
       case 'generateKeywords': result = generateKeywordsFromMaster(data.produkId, data.count); break;
       case 'refreshAllKeywords': result = refreshAllKeywords(); break;
+      default: result = { success: false, error: 'Aksi tidak dikenali: ' + action }; break;
     }
   } catch(err) {
     result = { success: false, error: err.toString() };
@@ -480,7 +485,7 @@ function addProduk(nama, deskripsi, prioritas, masterKeywords, heroImages, varia
   }
   
   const id = 'PRD_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMddHHmmss');
-  sheet.appendRow([id, nama, deskripsi, 'Aktif', prioritas || 5, new Date()]);
+  sheet.appendRow([id, nama, deskripsi || '', 'Aktif', prioritas || 5, new Date()]);
   
   // Simpan master keywords
   if (masterKeywords && masterKeywords.length > 0) {
@@ -489,8 +494,9 @@ function addProduk(nama, deskripsi, prioritas, masterKeywords, heroImages, varia
   
   // Buat sheet produk
   const sheetName = 'PRODUK_' + nama.replace(/\s+/g, '_').substring(0, 20);
-  if (!ss.getSheetByName(sheetName)) {
-    const ns = ss.insertSheet(sheetName);
+  let ns = ss.getSheetByName(sheetName);
+  if (!ns) {
+    ns = ss.insertSheet(sheetName);
     ns.appendRow(['Kata Kunci', 'Judul', 'Hero Image', 'Varian', 'Keterangan', 'Label', 'Status', 'Tgl Selesai', 'Spesifikasi', 'Gallery', 'URL Post']);
   }
   
@@ -510,11 +516,11 @@ function addProduk(nama, deskripsi, prioritas, masterKeywords, heroImages, varia
 function updateProduk(id, nama, deskripsi, status, prioritas, heroImages, varian, gallery, specs, sheetName) {
   const ss = getSS();
   const sheet = ss.getSheetByName('MASTER_PRODUK');
-  if (!sheet) return { success: false, error: 'Sheet tidak ditemukan' };
+  if (!sheet) return { success: false, error: 'Sheet MASTER_PRODUK tidak ditemukan' };
   
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === id) {
+    if (String(data[i][0]) === String(id)) {
       if (nama) sheet.getRange(i + 1, 2).setValue(nama);
       if (deskripsi !== undefined) sheet.getRange(i + 1, 3).setValue(deskripsi);
       if (status) sheet.getRange(i + 1, 4).setValue(status);
@@ -527,49 +533,79 @@ function updateProduk(id, nama, deskripsi, status, prioritas, heroImages, varian
       return { success: true };
     }
   }
-  return { success: false, error: 'Produk tidak ditemukan' };
+  return { success: false, error: 'Produk ID ' + id + ' tidak ditemukan di MASTER_PRODUK' };
 }
 
 function updateProdukData(sheetName, heroImages, varian, gallery, specs) {
   const ss = getSS();
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return { success: false, error: 'Sheet tidak ditemukan' };
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.appendRow(['Kata Kunci', 'Judul', 'Hero Image', 'Varian', 'Keterangan', 'Label', 'Status', 'Tgl Selesai', 'Spesifikasi', 'Gallery', 'URL Post']);
+  }
+
+  // Pastikan sheet memiliki minimal 11 kolom
+  if (sheet.getMaxColumns() < 11) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), 11 - sheet.getMaxColumns());
+  }
 
   const heroArr = Array.isArray(heroImages) ? heroImages : parseLinks(heroImages);
   const varianArr = Array.isArray(varian) ? varian : [];
   const galleryArr = Array.isArray(gallery) ? gallery : parseLinks(gallery);
   const specStr = String(specs || '').trim();
 
-  const maxRows = Math.max(heroArr.length, varianArr.length, galleryArr.length, 1);
-  const lastRow = sheet.getLastRow();
+  const maxDataRows = Math.max(heroArr.length, varianArr.length, galleryArr.length, 1);
+  const currentLastRow = Math.max(sheet.getLastRow(), 1);
+  const totalRowsNeeded = Math.max(currentLastRow, maxDataRows + 1);
 
-  if (lastRow <= 1 && maxRows > 0) {
-    for (let r = 0; r < maxRows; r++) {
+  // Pastikan baris cukup
+  if (sheet.getMaxRows() < totalRowsNeeded) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), totalRowsNeeded - sheet.getMaxRows());
+  }
+
+  // Jika baris kosong (hanya header)
+  if (sheet.getLastRow() <= 1) {
+    const rowsToAdd = [];
+    for (let r = 0; r < maxDataRows; r++) {
       const h = heroArr[r] || '';
-      const v = varianArr[r] ? (typeof varianArr[r] === 'object' ? varianArr[r].link : varianArr[r]) : '';
-      const vk = varianArr[r] ? (typeof varianArr[r] === 'object' ? varianArr[r].ket : '') : '';
+      const v = varianArr[r] ? (typeof varianArr[r] === 'object' ? (varianArr[r].link || '') : varianArr[r]) : '';
+      const vk = varianArr[r] ? (typeof varianArr[r] === 'object' ? (varianArr[r].ket || '') : '') : '';
       const g = galleryArr[r] || '';
-      sheet.appendRow(['', '', h, v, vk, '', '', '', specStr, g, '']);
+      const sp = (r === 0) ? specStr : '';
+      rowsToAdd.push(['', '', h, v, vk, '', '', '', sp, g, '']);
+    }
+    if (rowsToAdd.length > 0) {
+      sheet.getRange(2, 1, rowsToAdd.length, 11).setValues(rowsToAdd);
     }
     return { success: true };
   }
 
-  for (let r = 0; r < maxRows; r++) {
-    const rowIdx = r + 2;
-    if (rowIdx > sheet.getLastRow()) {
-      sheet.appendRow(['', '', '', '', '', '', '', '', '', '', '']);
+  // Baca seluruh data yang ada
+  const numRows = totalRowsNeeded - 1;
+  const range = sheet.getRange(2, 1, numRows, 11);
+  const values = range.getValues();
+
+  for (let r = 0; r < numRows; r++) {
+    if (r < heroArr.length) values[r][2] = heroArr[r];
+    else if (r < maxDataRows && heroArr.length === 0) values[r][2] = '';
+
+    if (r < varianArr.length) {
+      values[r][3] = typeof varianArr[r] === 'object' ? (varianArr[r].link || '') : varianArr[r];
+      values[r][4] = typeof varianArr[r] === 'object' ? (varianArr[r].ket || '') : '';
+    } else if (r < maxDataRows && varianArr.length === 0) {
+      values[r][3] = '';
+      values[r][4] = '';
     }
-    if (heroArr[r] !== undefined) sheet.getRange(rowIdx, 3).setValue(heroArr[r]);
-    if (varianArr[r] !== undefined) {
-      const v = typeof varianArr[r] === 'object' ? varianArr[r].link : varianArr[r];
-      const vk = typeof varianArr[r] === 'object' ? varianArr[r].ket : '';
-      sheet.getRange(rowIdx, 4).setValue(v);
-      sheet.getRange(rowIdx, 5).setValue(vk);
+
+    if (r === 0) {
+      values[r][8] = specStr;
     }
-    if (specStr && r === 0) sheet.getRange(rowIdx, 9).setValue(specStr);
-    if (galleryArr[r] !== undefined) sheet.getRange(rowIdx, 10).setValue(galleryArr[r]);
+
+    if (r < galleryArr.length) values[r][9] = galleryArr[r];
+    else if (r < maxDataRows && galleryArr.length === 0) values[r][9] = '';
   }
 
+  range.setValues(values);
   return { success: true };
 }
 

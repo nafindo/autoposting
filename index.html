@@ -647,20 +647,45 @@
 
     // ==================== API HELPER ====================
     async function apiGet(action, params = {}) {
-      const url = new URL(API_URL);
-      url.searchParams.append('action', action);
-      Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v));
-      const res = await fetch(url);
-      return res.json();
+      try {
+        const url = new URL(API_URL);
+        url.searchParams.append('action', action);
+        Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v));
+        const res = await fetch(url);
+        const text = await res.text();
+        try {
+          return JSON.parse(text);
+        } catch(err) {
+          if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+            throw new Error('Google Apps Script mengembalikan halaman HTML. Silakan deploy ulang (New Version) pada Apps Script.');
+          }
+          throw new Error(text.substring(0, 150) || 'Respon bukan format JSON valid');
+        }
+      } catch(e) {
+        throw e;
+      }
     }
 
     async function apiPost(action, data) {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action, ...data })
-      });
-      return res.json();
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action, ...data })
+        });
+        const text = await res.text();
+        try {
+          const json = JSON.parse(text);
+          return json;
+        } catch(err) {
+          if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+            throw new Error('Google Apps Script mengembalikan halaman HTML/Error. Pastikan code.gs terbaru sudah disalin dan di-deploy sebagai "New version" dengan akses "Anyone".');
+          }
+          throw new Error(text.substring(0, 150) || 'Respon bukan format JSON valid');
+        }
+      } catch(e) {
+        throw e;
+      }
     }
 
     // ==================== DASHBOARD ====================
@@ -1022,7 +1047,7 @@
       btn.innerHTML = '<div class="loading" style="width:14px;height:14px;border-width:2px"></div> Menyimpan...';
 
       try {
-        await apiPost('updateProduk', {
+        const res = await apiPost('updateProduk', {
           id,
           sheetName,
           nama,
@@ -1035,8 +1060,8 @@
           specs
         });
 
-        if (sheetName) {
-          await apiPost('updateProdukData', { sheetName, heroImages, varian, gallery, specs }).catch(() => {});
+        if (res && res.success === false) {
+          throw new Error(res.error || 'Gagal update produk');
         }
 
         showToast('Produk berhasil diupdate!', 'success');
@@ -1128,15 +1153,8 @@
           specs
         });
 
-        if (currentProdukId) {
-          await apiPost('updateProduk', {
-            id: currentProdukId,
-            sheetName: currentProdukSheet,
-            heroImages,
-            varian,
-            gallery,
-            specs
-          }).catch(() => {});
+        if (res && res.success === false) {
+          throw new Error(res.error || 'Gagal menyimpan data produk');
         }
 
         showToast('Gambar, Varian & Spesifikasi berhasil disimpan!', 'success');
