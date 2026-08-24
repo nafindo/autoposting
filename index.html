@@ -53,6 +53,8 @@
     .tab{padding:10px 20px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500;transition:.2s;border:none;background:transparent}
     .tab.active{background:var(--primary);color:#fff}
     .section{display:none}.section.active{display:block}
+    .keyword-section{display:none}
+    .keyword-section.active{display:block}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:1000}
     .modal-overlay.active{display:flex}.modal{background:#fff;border-radius:16px;width:90%;max-width:600px;max-height:90vh;overflow-y:auto}
     .modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
@@ -94,12 +96,12 @@
         <p>Blogger Automation Dashboard</p>
       </div>
       <nav>
-        <div class="nav-item active" onclick="navigate('dashboard')"><i class="fas fa-chart-line"></i><span>Dashboard</span></div>
-        <div class="nav-item" onclick="navigate('produk')"><i class="fas fa-boxes"></i><span>Produk</span></div>
-        <div class="nav-item" onclick="navigate('keyword')"><i class="fas fa-key"></i><span>Keyword</span></div>
-        <div class="nav-item" onclick="navigate('posting')"><i class="fas fa-play-circle"></i><span>Kontrol Posting</span></div>
-        <div class="nav-item" onclick="navigate('hasil')"><i class="fas fa-newspaper"></i><span>Hasil Posting</span></div>
-        <div class="nav-item" onclick="navigate('pengaturan')"><i class="fas fa-cog"></i><span>Pengaturan</span></div>
+        <div class="nav-item active" onclick="navigate('dashboard', this)"><i class="fas fa-chart-line"></i><span>Dashboard</span></div>
+        <div class="nav-item" onclick="navigate('produk', this)"><i class="fas fa-boxes"></i><span>Produk</span></div>
+        <div class="nav-item" onclick="navigate('keyword', this)"><i class="fas fa-key"></i><span>Keyword</span></div>
+        <div class="nav-item" onclick="navigate('posting', this)"><i class="fas fa-play-circle"></i><span>Kontrol Posting</span></div>
+        <div class="nav-item" onclick="navigate('hasil', this)"><i class="fas fa-newspaper"></i><span>Hasil Posting</span></div>
+        <div class="nav-item" onclick="navigate('pengaturan', this)"><i class="fas fa-cog"></i><span>Pengaturan</span></div>
       </nav>
     </div>
 
@@ -453,11 +455,11 @@
     let monthlyChartInstance = null;
 
     // ==================== NAVIGATION ====================
-    function navigate(id) {
+    function navigate(id, el) {
       document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       document.getElementById(id).classList.add('active');
-      event.currentTarget.classList.add('active');
+      if (el) el.classList.add('active');
       if (id === 'dashboard') loadDashboard();
       if (id === 'produk') loadProduk();
       if (id === 'hasil') loadLog();
@@ -849,11 +851,6 @@
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.getElementById('ktab-' + tab).classList.add('active');
       if (el) el.classList.add('active');
-      else {
-        const tabs = document.querySelectorAll('.tab');
-        const map = { list: 0, import: 1, image: 2, preview: 3 };
-        if (tabs[map[tab]]) tabs[map[tab]].classList.add('active');
-      }
     }
 
     async function saveKeyword() {
@@ -956,7 +953,8 @@
 
     function previewFromRow(keyword, row) {
       document.getElementById('previewKeywordSelect').value = row;
-      switchKeywordTab('preview');
+      const previewTab = document.querySelectorAll('#keywordPanel .tab')[3];
+      switchKeywordTab('preview', previewTab);
       generatePreview();
     }
 
