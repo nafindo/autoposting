@@ -145,7 +145,7 @@
         <div class="stats-grid">
           <div class="stat-card"><div class="icon icon-blue"><i class="fas fa-box"></i></div><div class="value" id="stProduk">0</div><div class="label">Total Produk</div></div>
           <div class="stat-card"><div class="icon icon-orange"><i class="fas fa-key"></i></div><div class="value" id="stKeyword">0</div><div class="label">Total Keyword</div></div>
-          <div class="stat-card"><div class="icon icon-green"><i class="fas fa-check-circle"></i></div><div class="value" id="stPosted">0</div><div class="label">Posted Hari Ini</div></div>
+          <div class="stat-card"><div class="icon icon-green"><i class="fas fa-check-circle"></i></div><div class="value" id="stPosted">0</div><div class="label" id="stPostedLabel">Posted Hari Ini</div></div>
           <div class="stat-card"><div class="icon icon-red"><i class="fas fa-clock"></i></div><div class="value" id="stQueue">0</div><div class="label">Dalam Antrian</div></div>
           <div class="stat-card"><div class="icon icon-purple"><i class="fas fa-layer-group"></i></div><div class="value" id="stProdukAktif">0</div><div class="label">Produk Aktif</div></div>
         </div>
@@ -408,8 +408,42 @@
         <div class="card">
           <div class="card-header"><h3>⚙️ Pengaturan Posting & Jadwal Acak</h3></div>
           <div class="card-body">
+            <!-- Kuota Target Harian Acak -->
+            <div class="form-row" style="background:#f0f7ff;padding:12px;border-radius:8px;border:1px dashed #b8daff;margin-bottom:14px;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label>🎯 Target Minimal Post / Hari <small style="color:#666">(Batas bawah)</small></label>
+                <input type="number" class="form-control" id="cfgMinPost" min="1" max="100" value="25">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>🎯 Target Maksimal Post / Hari <small style="color:#666">(Batas atas)</small></label>
+                <input type="number" class="form-control" id="cfgMaxPost" min="1" max="100" value="35">
+              </div>
+            </div>
+            <p style="font-size:12px;color:var(--text-sec);margin-top:-6px;margin-bottom:16px;">
+              ✨ <strong>Kuota Harian Acak:</strong> Target postingan harian akan diundi secara dinamis setiap hari baru dalam rentang ini (contoh: Senin 31 post, Selasa 35 post, Rabu 28 post).
+            </p>
+
             <div class="form-row">
-              <div class="form-group"><label>Max Post / Hari</label><input type="number" class="form-control" id="cfgMaxPost" min="1" max="100" value="40"></div>
+              <div class="form-group"><label>Jam Aktif Mulai</label><input type="number" class="form-control" id="cfgJamMulai" min="0" max="23" value="8"></div>
+              <div class="form-group"><label>Jam Aktif Selesai</label><input type="number" class="form-control" id="cfgJamSelesai" min="0" max="23" value="22"></div>
+            </div>
+
+            <!-- Jeda Menit Acak Antar Postingan -->
+            <div class="form-row" style="background:#f8f9fa;padding:12px;border-radius:8px;border:1px dashed #d2e3fc;margin-bottom:14px;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label>🎲 Jeda Minimal (Menit) <small style="color:#888">(Waktu terpendek)</small></label>
+                <input type="number" class="form-control" id="cfgMinDelay" min="5" max="120" value="17">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>🎲 Jeda Maksimal (Menit) <small style="color:#888">(Waktu terpanjang)</small></label>
+                <input type="number" class="form-control" id="cfgMaxDelay" min="5" max="120" value="35">
+              </div>
+            </div>
+            <p style="font-size:12px;color:var(--text-sec);margin-top:-6px;margin-bottom:16px;">
+              🛡️ <strong>Anti-Spam Acak:</strong> Sistem otomatis menentukan jeda waktu acak di antara rentang menit ini (misal: 19 mnt, 31 mnt, 24 mnt). Terlihat 100% alami bagi algoritma Google & Blogger.
+            </p>
+
+            <div class="form-row">
               <div class="form-group">
                 <label>Model AI</label>
                 <select class="form-control" id="cfgModel">
@@ -420,29 +454,13 @@
                   <option value="qwen/qwen3.6-27b">qwen/qwen3.6-27b</option>
                 </select>
               </div>
+              <div class="form-group"><label>Auto-Refresh Keyword (jam)</label><input type="number" class="form-control" id="cfgRefreshHour" min="0" max="23" value="0"></div>
             </div>
-            <div class="form-row">
-              <div class="form-group"><label>Jam Aktif Mulai</label><input type="number" class="form-control" id="cfgJamMulai" min="0" max="23" value="8"></div>
-              <div class="form-group"><label>Jam Aktif Selesai</label><input type="number" class="form-control" id="cfgJamSelesai" min="0" max="23" value="22"></div>
-            </div>
-            <div class="form-row" style="background:#f8f9fa;padding:12px;border-radius:8px;border:1px dashed #d2e3fc;margin-bottom:14px;">
-              <div class="form-group" style="margin-bottom:0;">
-                <label>🎲 Jeda Minimal (Menit) <small style="color:#888">(Waktu terpendek)</small></label>
-                <input type="number" class="form-control" id="cfgMinDelay" min="5" max="120" value="25">
-              </div>
-              <div class="form-group" style="margin-bottom:0;">
-                <label>🎲 Jeda Maksimal (Menit) <small style="color:#888">(Waktu terpanjang)</small></label>
-                <input type="number" class="form-control" id="cfgMaxDelay" min="5" max="120" value="45">
-              </div>
-            </div>
-            <p style="font-size:12px;color:var(--text-sec);margin-top:-6px;margin-bottom:16px;">
-              🛡️ <strong>Anti-Spam Acak:</strong> Sistem otomatis menentukan jeda waktu acak di antara rentang menit ini (misal: 27 mnt, 41 mnt, 33 mnt). Terlihat 100% alami bagi algoritma Google & Blogger.
-            </p>
+
             <div class="form-row">
               <div class="form-group"><label>WhatsApp</label><input type="text" class="form-control" id="cfgWa"></div>
               <div class="form-group"><label>Company Name</label><input type="text" class="form-control" id="cfgCompany"></div>
             </div>
-            <div class="form-group"><label>Auto-Refresh Keyword (jam)</label><input type="number" class="form-control" id="cfgRefreshHour" min="0" max="23" value="0"></div>
           </div>
         </div>
       </div>
@@ -821,7 +839,14 @@
         if (stats.success) {
           document.getElementById('stProduk').textContent = stats.totalProduk;
           document.getElementById('stKeyword').textContent = stats.totalKeyword;
-          document.getElementById('stPosted').textContent = stats.postedToday;
+          
+          const target = stats.targetToday || stats.maxPerDay || 35;
+          const minP = stats.minPostPerDay || 25;
+          const maxP = stats.maxPostPerDay || 35;
+          document.getElementById('stPosted').innerHTML = `${stats.postedToday} <span style="font-size:14px;color:var(--text-sec);font-weight:400">/ ${target}</span>`;
+          const lbl = document.getElementById('stPostedLabel');
+          if (lbl) lbl.innerHTML = `Posted Hari Ini <small style="display:block;color:var(--primary);font-size:11px;font-weight:500;">Target Acak: ${minP}-${maxP}</small>`;
+          
           document.getElementById('stQueue').textContent = stats.queued;
           document.getElementById('stProdukAktif').textContent = stats.totalProduk;
           updateTriggerUI(stats);
@@ -1985,12 +2010,13 @@
         
         document.getElementById('cfgSheetId').value = cfg.SPREADSHEET_ID || '';
         document.getElementById('cfgBlogId').value = cfg.BLOG_ID || '';
-        document.getElementById('cfgMaxPost').value = cfg.MAX_POST_PER_DAY || 40;
+        if (document.getElementById('cfgMinPost')) document.getElementById('cfgMinPost').value = cfg.MIN_POST_PER_DAY || 25;
+        if (document.getElementById('cfgMaxPost')) document.getElementById('cfgMaxPost').value = cfg.MAX_POST_PER_DAY || 35;
         document.getElementById('cfgModel').value = (!cfg.GROQ_MODEL || cfg.GROQ_MODEL === 'Groq') ? 'openai/gpt-oss-120b' : cfg.GROQ_MODEL;
         document.getElementById('cfgJamMulai').value = cfg.JAM_AKTIF_MULAI || 8;
         document.getElementById('cfgJamSelesai').value = cfg.JAM_AKTIF_SELESAI || 22;
-        if (document.getElementById('cfgMinDelay')) document.getElementById('cfgMinDelay').value = cfg.MIN_DELAY_MINUTES || 25;
-        if (document.getElementById('cfgMaxDelay')) document.getElementById('cfgMaxDelay').value = cfg.MAX_DELAY_MINUTES || 45;
+        if (document.getElementById('cfgMinDelay')) document.getElementById('cfgMinDelay').value = cfg.MIN_DELAY_MINUTES || 17;
+        if (document.getElementById('cfgMaxDelay')) document.getElementById('cfgMaxDelay').value = cfg.MAX_DELAY_MINUTES || 35;
         document.getElementById('cfgWa').value = cfg.WHATSAPP_NUMBER || '';
         document.getElementById('cfgCompany').value = cfg.COMPANY_NAME || '';
         document.getElementById('cfgFotoMode').value = cfg.FOTO_MODE || 'drive';
@@ -2042,12 +2068,13 @@
       const newConfig = {
         SPREADSHEET_ID: document.getElementById('cfgSheetId').value.trim(),
         BLOG_ID: document.getElementById('cfgBlogId').value.trim(),
-        MAX_POST_PER_DAY: parseInt(document.getElementById('cfgMaxPost').value) || 40,
+        MIN_POST_PER_DAY: parseInt(document.getElementById('cfgMinPost')?.value) || 25,
+        MAX_POST_PER_DAY: parseInt(document.getElementById('cfgMaxPost')?.value) || 35,
         GROQ_MODEL: document.getElementById('cfgModel').value.trim(),
         JAM_AKTIF_MULAI: parseInt(document.getElementById('cfgJamMulai').value) || 8,
         JAM_AKTIF_SELESAI: parseInt(document.getElementById('cfgJamSelesai').value) || 22,
-        MIN_DELAY_MINUTES: parseInt(document.getElementById('cfgMinDelay')?.value) || 25,
-        MAX_DELAY_MINUTES: parseInt(document.getElementById('cfgMaxDelay')?.value) || 45,
+        MIN_DELAY_MINUTES: parseInt(document.getElementById('cfgMinDelay')?.value) || 17,
+        MAX_DELAY_MINUTES: parseInt(document.getElementById('cfgMaxDelay')?.value) || 35,
         WHATSAPP_NUMBER: document.getElementById('cfgWa').value.trim(),
         COMPANY_NAME: document.getElementById('cfgCompany').value.trim(),
         FOTO_MODE: document.getElementById('cfgFotoMode').value,

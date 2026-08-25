@@ -11,11 +11,12 @@ const DEFAULT_CONFIG = {
   WHATSAPP_NUMBER: '081232797271',
   COMPANY_NAME: 'CV Nafindo Group',
   GROQ_MODEL: 'openai/gpt-oss-120b',
-  MAX_POST_PER_DAY: 40,
-  MIN_DELAY_MINUTES: 20,
-  MAX_DELAY_MINUTES: 40,
+  MIN_POST_PER_DAY: 25,
+  MAX_POST_PER_DAY: 35,
+  MIN_DELAY_MINUTES: 17,
+  MAX_DELAY_MINUTES: 35,
   POSTS_PER_BATCH: 1,
-  TRIGGER_INTERVAL_MINUTES: 36,
+  TRIGGER_INTERVAL_MINUTES: 25,
   JAM_AKTIF_MULAI: 8,
   JAM_AKTIF_SELESAI: 22,
   FOTO_MODE: 'drive',
@@ -129,7 +130,7 @@ function getConfig() {
   
   const data = sheet.getDataRange().getValues();
   const config = { ...DEFAULT_CONFIG };
-  const numFields = ['MAX_POST_PER_DAY', 'JAM_AKTIF_MULAI', 'JAM_AKTIF_SELESAI', 'TRIGGER_INTERVAL_MINUTES', 'KEYWORD_REFRESH_HOUR', 'MIN_DELAY_MINUTES', 'MAX_DELAY_MINUTES', 'POSTS_PER_BATCH'];
+  const numFields = ['MIN_POST_PER_DAY', 'MAX_POST_PER_DAY', 'JAM_AKTIF_MULAI', 'JAM_AKTIF_SELESAI', 'TRIGGER_INTERVAL_MINUTES', 'KEYWORD_REFRESH_HOUR', 'MIN_DELAY_MINUTES', 'MAX_DELAY_MINUTES', 'POSTS_PER_BATCH'];
 
   for (let i = 1; i < data.length; i++) {
     const key = String(data[i][0] || '').trim();
@@ -154,6 +155,32 @@ function getConfig() {
   return config;
 }
 
+function getTodayTargetPosts() {
+  const config = getConfig();
+  const minPost = Math.max(1, Number(config.MIN_POST_PER_DAY || 25));
+  const maxPost = Math.max(minPost, Number(config.MAX_POST_PER_DAY || 35));
+  
+  const props = PropertiesService.getScriptProperties();
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const storedDate = props.getProperty('TODAY_TARGET_DATE');
+  let target = Number(props.getProperty('TODAY_TARGET_POSTS'));
+  
+  // Jika hari baru atau belum ada target acak atau nilai target di luar rentang min-max baru
+  if (storedDate !== todayStr || !target || target < minPost || target > maxPost) {
+    target = Math.floor(Math.random() * (maxPost - minPost + 1)) + minPost;
+    props.setProperty('TODAY_TARGET_DATE', todayStr);
+    props.setProperty('TODAY_TARGET_POSTS', String(target));
+    console.log(`🎲 Target kuota posting acak hari ini (${todayStr}): ${target} postingan (Rentang: ${minPost}-${maxPost})`);
+  }
+  
+  return {
+    target: target,
+    minPost: minPost,
+    maxPost: maxPost,
+    date: todayStr
+  };
+}
+
 function saveConfig(configObj) {
   const ss = getSS();
   let sheet = ss.getSheetByName('CONFIG');
@@ -173,7 +200,7 @@ function saveConfig(configObj) {
     }
   });
   
-  // Sinkronkan juga nilai jeda acak ke PropertiesService
+  // Sinkronkan juga nilai jeda acak & kuota target ke PropertiesService
   const props = PropertiesService.getScriptProperties();
   if (configObj.MIN_DELAY_MINUTES) {
     props.setProperty('MIN_DELAY_MINUTES', String(configObj.MIN_DELAY_MINUTES));
@@ -181,6 +208,16 @@ function saveConfig(configObj) {
   if (configObj.MAX_DELAY_MINUTES) {
     props.setProperty('MAX_DELAY_MINUTES', String(configObj.MAX_DELAY_MINUTES));
   }
+  if (configObj.MIN_POST_PER_DAY) {
+    props.setProperty('MIN_POST_PER_DAY', String(configObj.MIN_POST_PER_DAY));
+  }
+  if (configObj.MAX_POST_PER_DAY) {
+    props.setProperty('MAX_POST_PER_DAY', String(configObj.MAX_POST_PER_DAY));
+  }
+  
+  // Re-generate target hari ini agar sesuai dengan rentang baru
+  props.deleteProperty('TODAY_TARGET_POSTS');
+  getTodayTargetPosts();
   
   // Jika trigger auto-posting sedang aktif, jadwalkan ulang dengan jeda baru sekarang juga
   const mode = props.getProperty('TRIGGER_MODE');
@@ -899,6 +936,7 @@ function getStats() {
   }
   
   const triggerStatus = getTriggerStatus();
+  const todayTargetInfo = getTodayTargetPosts();
   const now = new Date();
   const jam = now.getHours();
   const jamMulai = Number(config.JAM_AKTIF_MULAI) || 8;
@@ -907,7 +945,10 @@ function getStats() {
   return {
     success: true,
     totalProduk, totalKeyword, totalPosted, postedToday, queued,
-    maxPerDay: config.MAX_POST_PER_DAY || 40,
+    targetToday: todayTargetInfo.target,
+    minPostPerDay: todayTargetInfo.minPost,
+    maxPostPerDay: todayTargetInfo.maxPost,
+    maxPerDay: todayTargetInfo.target,
     triggerAktif: triggerStatus.active,
     nextPostTime: triggerStatus.nextPostTime,
     lastInterval: triggerStatus.lastInterval,
@@ -1138,9 +1179,10 @@ function buatPostinganOtomatis() {
       return;
     }
     
+    const todayTargetInfo = getTodayTargetPosts();
     const stats = getStats();
-    if (stats.postedToday >= config.MAX_POST_PER_DAY) {
-      console.log("Maksimal posting hari ini tercapai: " + stats.postedToday + "/" + config.MAX_POST_PER_DAY);
+    if (stats.postedToday >= todayTargetInfo.target) {
+      console.log(`Target kuota posting acak hari ini (${todayTargetInfo.target} post) sudah tercapai: ${stats.postedToday}/${todayTargetInfo.target}`);
       return;
     }
     
@@ -1377,10 +1419,14 @@ function jadwalkanPostinganBerikutnya() {
   const jamSelesai = Number(config.JAM_AKTIF_SELESAI) || 22;
   const targetHour = nextRun.getHours();
   
-  // Jika di luar jam kerja (misal jam 22:00 - 08:00), jadwalkan besok pagi pada jamMulai + random 5-20 menit
-  if (targetHour >= jamSelesai || targetHour < jamMulai) {
+  const todayTargetInfo = getTodayTargetPosts();
+  const stats = getStats();
+  const targetReached = stats.postedToday >= todayTargetInfo.target;
+  
+  // Jika di luar jam kerja ATAU kuota hari ini sudah tercapai, jadwalkan besok pagi pada jamMulai + random 5-20 menit
+  if (targetHour >= jamSelesai || targetHour < jamMulai || targetReached) {
     const tomorrow = new Date(now);
-    if (targetHour >= jamSelesai) {
+    if (targetHour >= jamSelesai || targetReached) {
       tomorrow.setDate(tomorrow.getDate() + 1);
     }
     const morningOffset = Math.floor(Math.random() * 20) + 5; // 08:05 - 08:25
