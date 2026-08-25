@@ -173,6 +173,15 @@ function saveConfig(configObj) {
     }
   });
   
+  // Sinkronkan juga nilai jeda acak ke PropertiesService
+  const props = PropertiesService.getScriptProperties();
+  if (configObj.MIN_DELAY_MINUTES) {
+    props.setProperty('MIN_DELAY_MINUTES', String(configObj.MIN_DELAY_MINUTES));
+  }
+  if (configObj.MAX_DELAY_MINUTES) {
+    props.setProperty('MAX_DELAY_MINUTES', String(configObj.MAX_DELAY_MINUTES));
+  }
+  
   return { success: true };
 }
 

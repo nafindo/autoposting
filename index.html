@@ -2059,12 +2059,14 @@
         await apiPost('saveConfig', { config: newConfig });
         await apiPost('saveAIKeys', { keys });
         showToast('Pengaturan disimpan!', 'success');
+        loadDashboard();
       } catch(e) { showToast('Gagal simpan: ' + e.message, 'error'); }
     }
 
     // ==================== INIT ====================
     window.onload = function() {
       loadDashboard();
+      loadSettings();
     };
   </script>
 </body>
