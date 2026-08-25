@@ -80,7 +80,7 @@ function doPost(e) {
       case 'updateKeyword': result = updateKeyword(data.sheetName, data.row, data.data); break;
       case 'postManual': result = postManual(data.produkNama, data.keyword, data.row); break;
       case 'saveAIKeys': result = saveAIKeys(data.keys); break;
-      case 'aktifkanTrigger': result = aktifkanTrigger(); break;
+      case 'aktifkanTrigger': result = aktifkanTrigger(data.minMinutes, data.maxMinutes); break;
       case 'nonaktifkanTrigger': result = nonaktifkanTrigger(); break;
       case 'testPosting': result = testPosting(); break;
       case 'resetStatusGagal': result = resetStatusGagal(data.sheetName); break;
@@ -883,8 +883,7 @@ function getStats() {
     }
   }
   
-  const triggers = ScriptApp.getProjectTriggers();
-  const triggerAktif = triggers.filter(t => t.getHandlerFunction() === 'buatPostinganOtomatis').length > 0;
+  const triggerStatus = getTriggerStatus();
   const now = new Date();
   const jam = now.getHours();
   const jamMulai = Number(config.JAM_AKTIF_MULAI) || 8;
@@ -894,7 +893,12 @@ function getStats() {
     success: true,
     totalProduk, totalKeyword, totalPosted, postedToday, queued,
     maxPerDay: config.MAX_POST_PER_DAY || 40,
-    triggerAktif,
+    triggerAktif: triggerStatus.active,
+    nextPostTime: triggerStatus.nextPostTime,
+    lastInterval: triggerStatus.lastInterval,
+    minMinutes: triggerStatus.minMinutes,
+    maxMinutes: triggerStatus.maxMinutes,
+    mode: triggerStatus.mode,
     jamMulai, jamSelesai,
     dalamJamAktif: jam >= jamMulai && jam < jamSelesai,
     jamSekarang: jam
@@ -1100,6 +1104,8 @@ function getQueue() {
 
 // ==================== POSTING ENGINE ====================
 
+// ==================== POSTING ENGINE ====================
+
 function buatPostinganOtomatis() {
   const config = getConfig();
   const ss = getSS();
@@ -1109,28 +1115,33 @@ function buatPostinganOtomatis() {
   const jamMulai = Number(config.JAM_AKTIF_MULAI) || 8;
   const jamSelesai = Number(config.JAM_AKTIF_SELESAI) || 22;
   
-  if (jam < jamMulai || jam >= jamSelesai) {
-    console.log("Istirahat jam " + jam);
-    return;
-  }
-  
-  const stats = getStats();
-  if (stats.postedToday >= config.MAX_POST_PER_DAY) return;
-  
-  const queue = getQueue();
-  if (queue.length === 0) {
-    console.log("Queue kosong");
-    return;
-  }
-  
-  const item = queue[0];
-  
-  console.log("Posting: " + item.keyword + " (" + item.produkNama + ")");
+  let currentItem = null;
   
   try {
+    if (jam < jamMulai || jam >= jamSelesai) {
+      console.log("Di luar jam aktif (" + jam + ":00). Jam aktif: " + jamMulai + ":00 - " + jamSelesai + ":00");
+      return;
+    }
+    
+    const stats = getStats();
+    if (stats.postedToday >= config.MAX_POST_PER_DAY) {
+      console.log("Maksimal posting hari ini tercapai: " + stats.postedToday + "/" + config.MAX_POST_PER_DAY);
+      return;
+    }
+    
+    const queue = getQueue();
+    if (queue.length === 0) {
+      console.log("Queue kosong, tidak ada keyword untuk diposting");
+      return;
+    }
+    
+    currentItem = queue[0];
+    const item = currentItem;
+    console.log("Memulai posting otomatis: " + item.keyword + " (" + item.produkNama + ")");
+    
     const pData = getProdukData(item.sheetName);
     if (!pData.success || pData.heroImages.length === 0) {
-      addLog(item.produkNama, item.keyword, 'Gagal', '', 'No hero');
+      addLog(item.produkNama, item.keyword, 'Gagal', '', 'Foto Hero kosong');
       return;
     }
     
@@ -1155,7 +1166,7 @@ function buatPostinganOtomatis() {
     
     const aiData = getAIDescription(item.produkNama, item.keyword, item.keterangan, pData.specs);
     if (!aiData) {
-      addLog(item.produkNama, item.keyword, 'Gagal', '', 'AI fail');
+      addLog(item.produkNama, item.keyword, 'Gagal', '', 'AI gagal membuat deskripsi');
       return;
     }
     
@@ -1175,13 +1186,21 @@ function buatPostinganOtomatis() {
       sheet.getRange(item.row, 8).setValue(new Date());
       if (resBlogger.url) sheet.getRange(item.row, 11).setValue(resBlogger.url);
       addLog(item.produkNama, item.keyword, 'Sukses', resBlogger.url || '', '');
-      console.log("BERHASIL: " + finalTitle);
+      console.log("BERHASIL POST: " + finalTitle);
     } else {
       const err = resBlogger ? (resBlogger.error || 'Blogger error') : 'Blogger error';
       addLog(item.produkNama, item.keyword, 'Gagal', '', err);
+      console.error("GAGAL POST: " + err);
     }
   } catch(e) {
-    addLog(item.produkNama, item.keyword, 'Gagal', '', e.toString());
+    console.error("Exception buatPostinganOtomatis: " + e);
+    addLog(currentItem ? currentItem.produkNama : '-', currentItem ? currentItem.keyword : '-', 'Gagal', '', e.toString());
+  } finally {
+    // Jadwalkan postingan acak berikutnya secara otomatis jika mode auto-posting aktif
+    const props = PropertiesService.getScriptProperties();
+    if (props.getProperty('TRIGGER_MODE') === 'random') {
+      jadwalkanPostinganBerikutnya();
+    }
   }
 }
 
@@ -1271,38 +1290,136 @@ function previewPost(produkNama, keyword, row) {
   return { success: true, html: finalHtml, title: aiData.title };
 }
 
-// ==================== TRIGGER ====================
+// ==================== TRIGGER JEDA ACAK (RANDOM INTERVAL) ====================
 
-function aktifkanTrigger() {
-  nonaktifkanTrigger();
+function hapusTriggerPosting() {
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(t => {
+    if (t.getHandlerFunction() === 'buatPostinganOtomatis') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+}
+
+function aktifkanTrigger(minMinutes, maxMinutes) {
   const config = getConfig();
-  const interval = config.TRIGGER_INTERVAL_MINUTES || 36;
+  
+  const min = Math.max(5, Number(minMinutes || config.MIN_DELAY_MINUTES || 25));
+  const max = Math.max(min, Number(maxMinutes || config.MAX_DELAY_MINUTES || 45));
+  
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('TRIGGER_MODE', 'random');
+  props.setProperty('MIN_DELAY_MINUTES', String(min));
+  props.setProperty('MAX_DELAY_MINUTES', String(max));
+  
+  // Hapus trigger buatPostinganOtomatis lama
+  hapusTriggerPosting();
+  
+  // Jadwalkan postingan pertama (1 - 2 menit dari sekarang agar segera mulai)
+  const firstDelay = Math.floor(Math.random() * 2) + 1;
+  const now = new Date();
+  const nextRun = new Date(now.getTime() + firstDelay * 60 * 1000);
   
   ScriptApp.newTrigger('buatPostinganOtomatis')
     .timeBased()
-    .everyMinutes(interval)
+    .at(nextRun)
     .create();
+    
+  props.setProperty('NEXT_POST_TIME', nextRun.toISOString());
+  props.setProperty('LAST_TRIGGER_INTERVAL', String(firstDelay));
   
-  // Aktifkan juga trigger refresh keyword harian
+  // Pastikan trigger refresh keyword harian jam 00:00 aktif
   aktifkanRefreshKeywordHarian();
   
-  return { success: true, message: 'Trigger aktif setiap ' + interval + ' menit + refresh keyword jam 00:00' };
+  const timeStr = Utilities.formatDate(nextRun, Session.getScriptTimeZone(), 'HH:mm');
+  return {
+    success: true,
+    message: `Auto-Posting Acak AKTIF! Jeda ${min}-${max} menit. Postingan pertama dijadwalkan pukul ${timeStr} WIB.`,
+    nextRun: nextRun.toISOString(),
+    min,
+    max
+  };
+}
+
+function jadwalkanPostinganBerikutnya() {
+  hapusTriggerPosting();
+  
+  const props = PropertiesService.getScriptProperties();
+  const mode = props.getProperty('TRIGGER_MODE');
+  if (mode !== 'random') return; // Jika trigger sedang dimatikan, jangan jadwalkan
+  
+  const config = getConfig();
+  const min = Math.max(5, Number(props.getProperty('MIN_DELAY_MINUTES') || config.MIN_DELAY_MINUTES || 25));
+  const max = Math.max(min, Number(props.getProperty('MAX_DELAY_MINUTES') || config.MAX_DELAY_MINUTES || 45));
+  
+  // Interval acak antara min dan max
+  const randomMinutes = Math.floor(Math.random() * (max - min + 1)) + min;
+  
+  const now = new Date();
+  let nextRun = new Date(now.getTime() + randomMinutes * 60 * 1000);
+  
+  const jamMulai = Number(config.JAM_AKTIF_MULAI) || 8;
+  const jamSelesai = Number(config.JAM_AKTIF_SELESAI) || 22;
+  const targetHour = nextRun.getHours();
+  
+  // Jika di luar jam kerja (misal jam 22:00 - 08:00), jadwalkan besok pagi pada jamMulai + random 5-20 menit
+  if (targetHour >= jamSelesai || targetHour < jamMulai) {
+    const tomorrow = new Date(now);
+    if (targetHour >= jamSelesai) {
+      tomorrow.setDate(tomorrow.getDate() + 1);
+    }
+    const morningOffset = Math.floor(Math.random() * 20) + 5; // 08:05 - 08:25
+    tomorrow.setHours(jamMulai, morningOffset, 0, 0);
+    nextRun = tomorrow;
+  }
+  
+  ScriptApp.newTrigger('buatPostinganOtomatis')
+    .timeBased()
+    .at(nextRun)
+    .create();
+    
+  props.setProperty('NEXT_POST_TIME', nextRun.toISOString());
+  props.setProperty('LAST_TRIGGER_INTERVAL', String(randomMinutes));
+  
+  console.log(`Jadwal posting acak berikutnya: ${Utilities.formatDate(nextRun, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss')} (jeda ${randomMinutes} menit)`);
 }
 
 function nonaktifkanTrigger() {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('TRIGGER_MODE', 'off');
+  props.deleteProperty('NEXT_POST_TIME');
+  
   const triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(t => {
     if (t.getHandlerFunction() === 'buatPostinganOtomatis' || t.getHandlerFunction() === 'refreshAllKeywords') {
       ScriptApp.deleteTrigger(t);
     }
   });
-  return { success: true, message: 'Trigger dinonaktifkan' };
+  return { success: true, message: 'Semua trigger auto-posting telah dinonaktifkan' };
 }
 
 function getTriggerStatus() {
   const triggers = ScriptApp.getProjectTriggers();
-  const active = triggers.filter(t => t.getHandlerFunction() === 'buatPostinganOtomatis');
-  return { success: true, active: active.length > 0, count: active.length };
+  const hasPostingTrigger = triggers.some(t => t.getHandlerFunction() === 'buatPostinganOtomatis');
+  const props = PropertiesService.getScriptProperties();
+  const mode = props.getProperty('TRIGGER_MODE') || (hasPostingTrigger ? 'random' : 'off');
+  const nextPostTime = props.getProperty('NEXT_POST_TIME');
+  const lastInterval = props.getProperty('LAST_TRIGGER_INTERVAL');
+  const config = getConfig();
+  const min = props.getProperty('MIN_DELAY_MINUTES') || config.MIN_DELAY_MINUTES || 25;
+  const max = props.getProperty('MAX_DELAY_MINUTES') || config.MAX_DELAY_MINUTES || 45;
+  
+  const isActive = hasPostingTrigger && mode !== 'off';
+  
+  return {
+    success: true,
+    active: isActive,
+    mode: mode,
+    nextPostTime: isActive ? nextPostTime : null,
+    lastInterval: isActive ? Number(lastInterval) : null,
+    minMinutes: Number(min),
+    maxMinutes: Number(max)
+  };
 }
 
 function testPosting() {

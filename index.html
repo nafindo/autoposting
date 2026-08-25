@@ -134,11 +134,11 @@
           <div class="queue-dot" id="queueDot"></div>
           <div>
             <div style="font-weight:600" id="queueStatus">Memuat...</div>
-            <div style="font-size:13px;color:var(--text-sec)">Status Otomasi</div>
+            <div style="font-size:13px;color:var(--text-sec)" id="queueStatusSub">Status Otomasi Acak</div>
           </div>
-          <div style="margin-left:auto;display:flex;gap:10px">
-            <button class="btn btn-success" id="btnStart" onclick="startTrigger()"><i class="fas fa-play"></i> Start</button>
-            <button class="btn btn-danger" id="btnStop" onclick="stopTrigger()" style="display:none"><i class="fas fa-stop"></i> Stop</button>
+          <div style="margin-left:auto;display:flex;gap:10px;align-items:center;">
+            <button class="btn btn-success" id="btnStart" onclick="startTrigger()"><i class="fas fa-play"></i> Start Otomasi</button>
+            <button class="btn btn-danger" id="btnStop" onclick="stopTrigger()" style="display:none"><i class="fas fa-stop"></i> Stop Otomasi</button>
           </div>
         </div>
 
@@ -406,10 +406,10 @@
         </div>
 
         <div class="card">
-          <div class="card-header"><h3>Pengaturan Posting</h3></div>
+          <div class="card-header"><h3>⚙️ Pengaturan Posting & Jadwal Acak</h3></div>
           <div class="card-body">
             <div class="form-row">
-              <div class="form-group"><label>Max Post/Hari</label><input type="number" class="form-control" id="cfgMaxPost" min="1" max="50"></div>
+              <div class="form-group"><label>Max Post / Hari</label><input type="number" class="form-control" id="cfgMaxPost" min="1" max="100" value="40"></div>
               <div class="form-group">
                 <label>Model AI</label>
                 <select class="form-control" id="cfgModel">
@@ -422,17 +422,27 @@
               </div>
             </div>
             <div class="form-row">
-              <div class="form-group"><label>Jam Aktif Mulai</label><input type="number" class="form-control" id="cfgJamMulai" min="0" max="23"></div>
-              <div class="form-group"><label>Jam Aktif Selesai</label><input type="number" class="form-control" id="cfgJamSelesai" min="0" max="23"></div>
+              <div class="form-group"><label>Jam Aktif Mulai</label><input type="number" class="form-control" id="cfgJamMulai" min="0" max="23" value="8"></div>
+              <div class="form-group"><label>Jam Aktif Selesai</label><input type="number" class="form-control" id="cfgJamSelesai" min="0" max="23" value="22"></div>
             </div>
+            <div class="form-row" style="background:#f8f9fa;padding:12px;border-radius:8px;border:1px dashed #d2e3fc;margin-bottom:14px;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label>🎲 Jeda Minimal (Menit) <small style="color:#888">(Waktu terpendek)</small></label>
+                <input type="number" class="form-control" id="cfgMinDelay" min="5" max="120" value="25">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>🎲 Jeda Maksimal (Menit) <small style="color:#888">(Waktu terpanjang)</small></label>
+                <input type="number" class="form-control" id="cfgMaxDelay" min="5" max="120" value="45">
+              </div>
+            </div>
+            <p style="font-size:12px;color:var(--text-sec);margin-top:-6px;margin-bottom:16px;">
+              🛡️ <strong>Anti-Spam Acak:</strong> Sistem otomatis menentukan jeda waktu acak di antara rentang menit ini (misal: 27 mnt, 41 mnt, 33 mnt). Terlihat 100% alami bagi algoritma Google & Blogger.
+            </p>
             <div class="form-row">
-              <div class="form-group"><label>Interval Trigger (menit)</label><input type="number" class="form-control" id="cfgInterval" min="10"></div>
               <div class="form-group"><label>WhatsApp</label><input type="text" class="form-control" id="cfgWa"></div>
-            </div>
-            <div class="form-row">
               <div class="form-group"><label>Company Name</label><input type="text" class="form-control" id="cfgCompany"></div>
-              <div class="form-group"><label>Refresh Keyword (jam)</label><input type="number" class="form-control" id="cfgRefreshHour" min="0" max="23" value="0"></div>
             </div>
+            <div class="form-group"><label>Auto-Refresh Keyword (jam)</label><input type="number" class="form-control" id="cfgRefreshHour" min="0" max="23" value="0"></div>
           </div>
         </div>
       </div>
@@ -814,7 +824,7 @@
           document.getElementById('stPosted').textContent = stats.postedToday;
           document.getElementById('stQueue').textContent = stats.queued;
           document.getElementById('stProdukAktif').textContent = stats.totalProduk;
-          updateTriggerUI(stats.triggerAktif, stats.dalamJamAktif, stats.jamSekarang);
+          updateTriggerUI(stats);
         } else {
           showToast('API Error: ' + (stats.error || 'Unknown error'), 'error');
         }
@@ -827,20 +837,44 @@
       }
     }
 
-    function updateTriggerUI(active, dalamJam, jam) {
+    function updateTriggerUI(stats) {
+      const active = typeof stats === 'object' ? stats.triggerAktif : stats;
+      const dalamJam = typeof stats === 'object' ? stats.dalamJamAktif : true;
+      const jam = typeof stats === 'object' ? stats.jamSekarang : new Date().getHours();
+      
       const dot = document.getElementById('queueDot');
       const txt = document.getElementById('queueStatus');
+      const sub = document.getElementById('queueStatusSub');
       const startBtns = [document.getElementById('btnStart'), document.getElementById('btnStart2')];
       const stopBtns = [document.getElementById('btnStop'), document.getElementById('btnStop2')];
       
       if (active) {
         dot.className = dalamJam ? 'queue-dot active' : 'queue-dot paused';
-        txt.innerHTML = dalamJam ? 'Otomasi Aktif & Running' : `Otomasi Aktif <span style="color:#fbbc04">(Istirahat jam ${jam}:00)</span>`;
+        const minM = (stats && stats.minMinutes) || 25;
+        const maxM = (stats && stats.maxMinutes) || 45;
+        
+        let nextStr = '';
+        if (stats && stats.nextPostTime) {
+          const nextDate = new Date(stats.nextPostTime);
+          const diffMs = nextDate - new Date();
+          const diffMins = Math.round(diffMs / 60000);
+          const timeFormatted = nextDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+          if (diffMins > 0) {
+            nextStr = ` • Next: ${timeFormatted} WIB (~${diffMins} mnt lagi)`;
+          } else {
+            nextStr = ` • Next: ${timeFormatted} WIB (segera)`;
+          }
+        }
+        
+        txt.innerHTML = dalamJam ? `Otomasi Acak Aktif 🟢 <small style="font-weight:400;color:var(--text-sec)">(${minM}-${maxM} mnt)</small>` : `Otomasi Aktif <span style="color:#fbbc04">(Istirahat jam ${jam}:00)</span>`;
+        if (sub) sub.innerHTML = nextStr ? `<span style="color:#1a73e8;font-weight:600;">${nextStr}</span>` : `Jeda waktu acak (${minM}-${maxM} menit)`;
+        
         startBtns.forEach(b => { if(b) b.style.display = 'none'; });
         stopBtns.forEach(b => { if(b) b.style.display = 'inline-flex'; });
       } else {
         dot.className = 'queue-dot inactive';
         txt.textContent = 'Otomasi Nonaktif';
+        if (sub) sub.textContent = 'Auto-posting sedang berhenti';
         startBtns.forEach(b => { if(b) b.style.display = 'inline-flex'; });
         stopBtns.forEach(b => { if(b) b.style.display = 'none'; });
       }
@@ -1890,19 +1924,25 @@
 
     // ==================== TRIGGER ====================
     async function startTrigger() {
+      const minEl = document.getElementById('cfgMinDelay');
+      const maxEl = document.getElementById('cfgMaxDelay');
+      const minMinutes = minEl ? parseInt(minEl.value) : (config.MIN_DELAY_MINUTES || 25);
+      const maxMinutes = maxEl ? parseInt(maxEl.value) : (config.MAX_DELAY_MINUTES || 45);
+      
+      showToast('Mengaktifkan auto-posting acak...', 'info');
       try {
-        const res = await apiPost('aktifkanTrigger', {});
-        showToast(res.message, 'success');
+        const res = await apiPost('aktifkanTrigger', { minMinutes, maxMinutes });
+        showToast(res.message || 'Auto-posting acak diaktifkan!', 'success');
         loadDashboard();
-      } catch(e) { showToast('Gagal start', 'error'); }
+      } catch(e) { showToast('Gagal start: ' + e.message, 'error'); }
     }
 
     async function stopTrigger() {
       try {
         const res = await apiPost('nonaktifkanTrigger', {});
-        showToast(res.message, 'success');
+        showToast(res.message || 'Auto-posting dinonaktifkan', 'success');
         loadDashboard();
-      } catch(e) { showToast('Gagal stop', 'error'); }
+      } catch(e) { showToast('Gagal stop: ' + e.message, 'error'); }
     }
 
     async function runNow() {
@@ -1949,7 +1989,8 @@
         document.getElementById('cfgModel').value = (!cfg.GROQ_MODEL || cfg.GROQ_MODEL === 'Groq') ? 'openai/gpt-oss-120b' : cfg.GROQ_MODEL;
         document.getElementById('cfgJamMulai').value = cfg.JAM_AKTIF_MULAI || 8;
         document.getElementById('cfgJamSelesai').value = cfg.JAM_AKTIF_SELESAI || 22;
-        document.getElementById('cfgInterval').value = cfg.TRIGGER_INTERVAL_MINUTES || 36;
+        if (document.getElementById('cfgMinDelay')) document.getElementById('cfgMinDelay').value = cfg.MIN_DELAY_MINUTES || 25;
+        if (document.getElementById('cfgMaxDelay')) document.getElementById('cfgMaxDelay').value = cfg.MAX_DELAY_MINUTES || 45;
         document.getElementById('cfgWa').value = cfg.WHATSAPP_NUMBER || '';
         document.getElementById('cfgCompany').value = cfg.COMPANY_NAME || '';
         document.getElementById('cfgFotoMode').value = cfg.FOTO_MODE || 'drive';
@@ -2005,7 +2046,8 @@
         GROQ_MODEL: document.getElementById('cfgModel').value.trim(),
         JAM_AKTIF_MULAI: parseInt(document.getElementById('cfgJamMulai').value) || 8,
         JAM_AKTIF_SELESAI: parseInt(document.getElementById('cfgJamSelesai').value) || 22,
-        TRIGGER_INTERVAL_MINUTES: parseInt(document.getElementById('cfgInterval').value) || 36,
+        MIN_DELAY_MINUTES: parseInt(document.getElementById('cfgMinDelay')?.value) || 25,
+        MAX_DELAY_MINUTES: parseInt(document.getElementById('cfgMaxDelay')?.value) || 45,
         WHATSAPP_NUMBER: document.getElementById('cfgWa').value.trim(),
         COMPANY_NAME: document.getElementById('cfgCompany').value.trim(),
         FOTO_MODE: document.getElementById('cfgFotoMode').value,
@@ -2017,7 +2059,7 @@
         await apiPost('saveConfig', { config: newConfig });
         await apiPost('saveAIKeys', { keys });
         showToast('Pengaturan disimpan!', 'success');
-      } catch(e) { showToast('Gagal simpan', 'error'); }
+      } catch(e) { showToast('Gagal simpan: ' + e.message, 'error'); }
     }
 
     // ==================== INIT ====================
