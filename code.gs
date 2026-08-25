@@ -182,6 +182,12 @@ function saveConfig(configObj) {
     props.setProperty('MAX_DELAY_MINUTES', String(configObj.MAX_DELAY_MINUTES));
   }
   
+  // Jika trigger auto-posting sedang aktif, jadwalkan ulang dengan jeda baru sekarang juga
+  const mode = props.getProperty('TRIGGER_MODE');
+  if (mode === 'random') {
+    jadwalkanPostinganBerikutnya();
+  }
+  
   return { success: true };
 }
 
