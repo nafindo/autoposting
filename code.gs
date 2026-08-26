@@ -354,10 +354,12 @@ function generateKeywordsFromMaster(produkId, count) {
   
   const produkData = produkSheet.getDataRange().getValues();
   let produkNama = '';
+  let produkDeskripsi = '';
   let defaultLabel = '';
   for (let i = 1; i < produkData.length; i++) {
     if (produkData[i][0] === produkId) {
       produkNama = produkData[i][1];
+      produkDeskripsi = produkData[i][2] || '';
       defaultLabel = produkData[i][6] || '';
       break;
     }
@@ -370,19 +372,21 @@ function generateKeywordsFromMaster(produkId, count) {
   const masterKeywords = masterRes.keywords.map(k => k.keyword);
   if (masterKeywords.length === 0) return { success: false, error: 'Tidak ada keyword master' };
   
-  // Ambil semua keyword yang sudah ada (untuk cek duplicate)
+  // Ambil semua keyword yang sudah ada (untuk cek duplicate) & spesifikasi produk
   const sheetName = 'PRODUK_' + produkNama.replace(/\s+/g, '_').substring(0, 20);
   const pSheet = ss.getSheetByName(sheetName);
   const existingKeywords = new Set();
+  let specsStr = '';
   if (pSheet) {
     const pData = pSheet.getDataRange().getValues();
     for (let i = 1; i < pData.length; i++) {
       if (pData[i][0]) existingKeywords.add(String(pData[i][0]).toLowerCase().trim());
+      if (pData[i][8] && !specsStr) specsStr = String(pData[i][8]).trim();
     }
   }
   
-  // Generate via AI
-  const newKeywords = generateKeywordsAI(produkNama, masterKeywords, count || 50, existingKeywords);
+  // Generate via AI dengan pemahaman produk & SEO Intent yang ketat
+  const newKeywords = generateKeywordsAI(produkNama, masterKeywords, count || 50, existingKeywords, produkDeskripsi, specsStr);
   
   if (newKeywords.length === 0) return { success: false, error: 'Gagal generate keyword' };
   
@@ -405,31 +409,55 @@ function generateKeywordsFromMaster(produkId, count) {
   return { success: true, generated: newKeywords.length, added: added, keywords: newKeywords };
 }
 
-function generateKeywordsAI(produkNama, masterKeywords, count, existingSet) {
+function generateKeywordsAI(produkNama, masterKeywords, count, existingSet, produkDeskripsi, specs) {
   const apiKey = getAIKeyRotation();
   const url = 'https://api.groq.com/openai/v1/chat/completions';
   
-  const prompt = `Kamu adalah ahli SEO untuk e-commerce di Indonesia.
+  const prompt = `Kamu adalah Pakar Riset Keyword SEO & Search Intent Specialist untuk Google Indonesia.
 
-PRODUK: ${produkNama}
-KEYWORD MASTER: ${masterKeywords.join(', ')}
+INFORMASI PRODUK:
+- Nama Produk: ${produkNama}
+- Keyword Master: ${masterKeywords.join(', ')}
+${produkDeskripsi ? `- Deskripsi Produk: ${produkDeskripsi}` : ''}
+${specs ? `- Spesifikasi / Material: ${specs}` : ''}
 
-TUGAS:
-Buat ${count} keyword long tail SEO dalam bahasa Indonesia yang berbeda-beda, berdasarkan keyword master di atas.
+TUGAS UTAMA:
+Buat ${count} Long Tail Keywords SEO bahasa Indonesia yang 100% RELEVAN KHUSUS untuk produk "${produkNama}".
+Fokuskan pada High Commercial & Transactional Search Intent (kata kunci yang sering diketik calon pembeli saat ingin mencari, membeli, atau menyewa jasa di Google).
 
-CONTOH FORMAT OUTPUT:
-- Jika master "lantai kayu": "lantai kayu jakarta", "harga lantai kayu per meter", "jual lantai kayu murah bandung", dll
-- Jika master "vinyl flooring": "vinyl flooring anti air", "pasang vinyl flooring rumah minimalis", dll
+POLA RUMUS SEO SEARCH INTENT (Kombinasikan secara variatif & alami):
+1. Pola Transaksi / Pembelian:
+   - "jual [keyword] [kota]"
+   - "harga [keyword] per meter / per m2 / per box [kota]"
+   - "distributor / supplier / agen [keyword] [kota]"
+   - "toko [keyword] terdekat [kota]"
+   - "grosir [keyword] termurah"
+2. Pola Jasa & Pemasangan:
+   - "jasa pasang [keyword] [kota]"
+   - "biaya pasang [keyword] per m2 [kota]"
+   - "tukang pasang [keyword] terpercaya [kota]"
+3. Pola Spesifikasi & Keunggulan Produk:
+   - "[keyword] motif kayu jati / minimalis / modern"
+   - "[keyword] 2mm anti rayap dan tahan air"
+   - "[keyword] berkualitas awet"
+4. Pola Aplikasi & Kebutuhan Ruangan:
+   - "[keyword] untuk kamar tidur / ruang tamu / dapur / kantor / cafe / hotel"
+   - "[keyword] untuk lantai rumah minimalis"
+5. Variasi Target Kota Indonesia (Local SEO):
+   - Jakarta, Surabaya, Bandung, Medan, Semarang, Makassar, Tangerang, Bekasi, Depok, Bogor, Bali, Yogyakarta, Solo, Malang, Balikpapan, Palembang, dll.
 
-ATURAN PENTING:
-1. Setiap keyword HARUS berbeda dan unik
-2. Gunakan variasi kota Indonesia (Jakarta, Bandung, Surabaya, Medan, Makassar, Bali, dll)
-3. Gunakan variasi intent: harga, jual, pasang, murah, terbaik, anti air, rumah minimalis, kantor, dll
-4. JANGAN pakai keyword yang sudah ada di list berikut: ${Array.from(existingSet).slice(0, 100).join(', ')}
-5. Return HANYA array JSON string, tidak ada penjelasan lain
+⚠️ ATURAN KETAT (STRICT BOUNDARIES):
+1. FOKUS LINGKUP PRODUK: Semua keyword HARUS berada dalam lingkup produk "${produkNama}" dan Keyword Master yang diberikan.
+2. DILARANG KERAS mencampuradukkan dengan material / produk lain yang BEDA KATEGORI.
+   - Contoh: Jika produknya "Vinyl / Vinyl Plank", DILARANG SEKALI-KALI memasukkan kata "SPC", "Parket Kayu Asli", "Keramik", "Granit", "Marmer", atau "Karpet".
+   - Jika produknya "Pintu Harmonika", jangan masukkan "Rolling Door" kecuali disebutkan di master keyword.
+3. DILARANG menyebut merek kompetitor lain kecuali merek produk ini (${produkNama}).
+4. Setiap keyword HARUS unik dan TIDAK BOLEH sama dengan yang sudah ada di list berikut: ${Array.from(existingSet).slice(0, 100).join(', ')}.
+5. Huruf kecil semua (lowercase), tanpa nomor urut di depan (seperti 1., 2.), tanpa tanda kutip.
+6. Kembalikan HANYA format JSON valid tanpa kata pengantar atau penutup.
 
 OUTPUT FORMAT (JSON):
-{"keywords": ["keyword1", "keyword2", "keyword3", ...]}`;
+{"keywords": ["keyword 1", "keyword 2", "keyword 3", ...]}`;
 
   try {
     const res = UrlFetchApp.fetch(url, {
@@ -439,11 +467,11 @@ OUTPUT FORMAT (JSON):
       payload: JSON.stringify({
         model: 'openai/gpt-oss-120b',
         messages: [
-          { role: 'system', content: 'Kamu adalah ahli SEO Indonesia. Return JSON valid.' },
+          { role: 'system', content: 'Kamu adalah pakar riset SEO Google Indonesia. Hasilkan keyword terstruktur 100% relevan dalam JSON valid.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.8,
-        max_tokens: 2048,
+        temperature: 0.7,
+        max_tokens: 3000,
         response_format: { type: 'json_object' }
       }),
       muteHttpExceptions: true
@@ -453,7 +481,35 @@ OUTPUT FORMAT (JSON):
     if (!json.choices || !json.choices[0]?.message?.content) return [];
     
     const content = JSON.parse(json.choices[0].message.content);
-    return content.keywords || [];
+    const rawKeywords = content.keywords || [];
+    
+    // Double Filter Sanitasi: Menghapus keyword yang melenceng dari jenis produk
+    const cleanKeywords = [];
+    const forbiddenTerms = [];
+    const lowerProd = (produkNama + ' ' + masterKeywords.join(' ')).toLowerCase();
+    
+    // Jika produknya vinyl murni (bukan SPC), blacklist kata SPC
+    if (lowerProd.includes('vinyl') && !lowerProd.includes('spc')) {
+      forbiddenTerms.push('spc');
+    }
+    // Jika produknya SPC murni, blacklist kata vinyl roll atau stiker jika tidak relevan
+    if (lowerProd.includes('spc') && !lowerProd.includes('vinyl')) {
+      forbiddenTerms.push('vinyl roll');
+    }
+    
+    rawKeywords.forEach(kw => {
+      if (typeof kw !== 'string') return;
+      const cleanKw = kw.toLowerCase().trim().replace(/^[0-9]+[\.\)\-]\s*/, '');
+      if (!cleanKw || cleanKw.length < 5) return;
+      
+      // Cek apakah mengandung kata terlarang yang melenceng
+      const hasForbidden = forbiddenTerms.some(term => cleanKw.includes(term));
+      if (!hasForbidden) {
+        cleanKeywords.push(cleanKw);
+      }
+    });
+    
+    return cleanKeywords;
   } catch(e) {
     console.error('Generate keyword error: ' + e);
     return [];
@@ -1539,9 +1595,9 @@ DATA SPESIFIKASI ASLI:
 ${spec || 'Hubungi admin untuk detail spesifikasi.'}
 
 TUGAS:
-1. Artikel 3-4 paragraf HTML persuasif, SEO-friendly, bahasa Indonesia.
+1. Artikel 3-4 paragraf HTML persuasif, SEO-friendly, bahasa Indonesia. Fokus 100% pada produk "${nama}" dan kata kunci "${kw}".
 2. Tabel HTML spesifikasi, header #4285f4 teks putih.
-3. JANGAN mengarang data spesifikasi.
+3. JANGAN mengarang data spesifikasi di luar data asli, dan DILARANG menyebut produk/material jenis lain yang berbeda kategori.
 4. Judul SEO: kata kunci menarik | produk | kota Indonesia acak | ${config.WHATSAPP_NUMBER}
 
 OUTPUT JSON:
