@@ -1381,58 +1381,85 @@ function buatPostinganOtomatis() {
     const item = currentItem;
     console.log("Memulai posting otomatis: " + item.keyword + " (" + item.produkNama + ")");
     
-    const pData = getProdukData(item.sheetName);
-    if (!pData.success || pData.heroImages.length === 0) {
-      addLog(item.produkNama, item.keyword, 'Gagal', '', 'Foto Hero kosong');
-      return;
-    }
+    const MAX_RETRIES = 3;
+    let attempt = 0;
+    let isSuccess = false;
+    let lastError = '';
     
-    let labelRaw = item.labelRaw;
-    if (!labelRaw) {
-      const sheet = ss.getSheetByName(item.sheetName);
-      const allData = sheet.getDataRange().getValues();
-      for (let prev = item.row - 2; prev >= 1; prev--) {
-        if (allData[prev][5] && String(allData[prev][5]).trim()) {
-          labelRaw = allData[prev][5];
-          break;
+    while (attempt < MAX_RETRIES && !isSuccess) {
+      attempt++;
+      console.log(`[Percobaan ${attempt}/${MAX_RETRIES}] Memproses postingan: "${item.keyword}" (${item.produkNama})`);
+      
+      const pData = getProdukData(item.sheetName);
+      if (!pData.success || !pData.heroImages || pData.heroImages.length === 0) {
+        lastError = 'Foto Hero kosong atau sheet produk tidak valid';
+        console.warn(`[Percobaan ${attempt}] ${lastError}`);
+        if (attempt < MAX_RETRIES) Utilities.sleep(2000);
+        continue;
+      }
+      
+      let labelRaw = item.labelRaw;
+      if (!labelRaw) {
+        const sheet = ss.getSheetByName(item.sheetName);
+        const allData = sheet.getDataRange().getValues();
+        for (let prev = item.row - 2; prev >= 1; prev--) {
+          if (allData[prev][5] && String(allData[prev][5]).trim()) {
+            labelRaw = allData[prev][5];
+            break;
+          }
         }
       }
+      if (!labelRaw && pData.labels) {
+        labelRaw = pData.labels;
+      }
+      const labels = labelRaw ? String(labelRaw).split(',').map(l => l.trim()).filter(Boolean) : [item.produkNama, 'Katalog Jualan'];
+      
+      const heroLink = pData.heroImages[Math.floor(Math.random() * pData.heroImages.length)];
+      const heroThumb = getImageUrlFromLink(heroLink);
+      
+      const aiData = getAIDescription(item.produkNama, item.keyword, item.keterangan, pData.specs);
+      if (!aiData) {
+        lastError = 'AI gagal membuat konten deskripsi / limit rate';
+        console.warn(`[Percobaan ${attempt}] ${lastError}. Merotasi API key & mencoba ulang...`);
+        if (attempt < MAX_RETRIES) Utilities.sleep(3000);
+        continue;
+      }
+      
+      const finalTitle = item.judul || aiData.title;
+      const finalHtml = buildModernTemplate({
+        heroImg: heroThumb, heroOriginal: heroLink,
+        kataKunci: item.keyword, deskripsiAi: aiData.description,
+        tabelAi: aiData.table, gallery: pData.gallery || pData.saranWarna, varian: pData.varian || pData.galleryVarian
+      });
+      
+      const resBlogger = postKeBlogger(finalTitle, finalHtml, labels);
+      
+      if (resBlogger && resBlogger.success) {
+        isSuccess = true;
+        const sheet = ss.getSheetByName(item.sheetName);
+        sheet.getRange(item.row, 2).setValue(finalTitle);
+        sheet.getRange(item.row, 7).setValue('Selesai');
+        sheet.getRange(item.row, 8).setValue(new Date());
+        if (resBlogger.url) sheet.getRange(item.row, 11).setValue(resBlogger.url);
+        
+        const retryTag = attempt > 1 ? ` (Sukses setelah ${attempt}x coba)` : '';
+        addLog(item.produkNama, item.keyword, 'Sukses' + retryTag, resBlogger.url || '', '');
+        console.log(`✅ BERHASIL POST (${attempt}x percobaan): ${finalTitle}`);
+        break;
+      } else {
+        lastError = resBlogger ? (resBlogger.error || 'Blogger error') : 'Blogger error';
+        console.warn(`[Percobaan ${attempt}] Gagal post ke Blogger: ${lastError}`);
+        if (attempt < MAX_RETRIES) Utilities.sleep(3000);
+      }
     }
-    if (!labelRaw && pData.labels) {
-      labelRaw = pData.labels;
-    }
-    const labels = labelRaw ? String(labelRaw).split(',').map(l => l.trim()).filter(Boolean) : [item.produkNama, 'Katalog Jualan'];
     
-    const heroLink = pData.heroImages[Math.floor(Math.random() * pData.heroImages.length)];
-    const heroThumb = getImageUrlFromLink(heroLink);
-    
-    const aiData = getAIDescription(item.produkNama, item.keyword, item.keterangan, pData.specs);
-    if (!aiData) {
-      addLog(item.produkNama, item.keyword, 'Gagal', '', 'AI gagal membuat deskripsi');
-      return;
-    }
-    
-    const finalTitle = item.judul || aiData.title;
-    const finalHtml = buildModernTemplate({
-      heroImg: heroThumb, heroOriginal: heroLink,
-      kataKunci: item.keyword, deskripsiAi: aiData.description,
-      tabelAi: aiData.table, gallery: pData.gallery || pData.saranWarna, varian: pData.varian || pData.galleryVarian
-    });
-    
-    const resBlogger = postKeBlogger(finalTitle, finalHtml, labels);
-    
-    if (resBlogger && resBlogger.success) {
+    if (!isSuccess) {
       const sheet = ss.getSheetByName(item.sheetName);
-      sheet.getRange(item.row, 2).setValue(finalTitle);
-      sheet.getRange(item.row, 7).setValue('Selesai');
-      sheet.getRange(item.row, 8).setValue(new Date());
-      if (resBlogger.url) sheet.getRange(item.row, 11).setValue(resBlogger.url);
-      addLog(item.produkNama, item.keyword, 'Sukses', resBlogger.url || '', '');
-      console.log("BERHASIL POST: " + finalTitle);
-    } else {
-      const err = resBlogger ? (resBlogger.error || 'Blogger error') : 'Blogger error';
-      addLog(item.produkNama, item.keyword, 'Gagal', '', err);
-      console.error("GAGAL POST: " + err);
+      if (sheet) {
+        sheet.getRange(item.row, 7).setValue('Gagal');
+      }
+      addLog(item.produkNama, item.keyword, 'Gagal (3x Coba)', '', lastError);
+      console.error(`❌ GAGAL TOTAL setelah 3x percobaan instan: ${lastError}`);
     }
   } catch(e) {
     console.error("Exception buatPostinganOtomatis: " + e);
@@ -1474,35 +1501,52 @@ function postManual(produkNama, keyword, row) {
   }
   const labels = labelRaw ? String(labelRaw).split(',').map(l => l.trim()).filter(Boolean) : [produkNama, 'Katalog Jualan'];
   
-  const heroLink = (pData.heroImages && pData.heroImages.length > 0)
-    ? pData.heroImages[Math.floor(Math.random() * pData.heroImages.length)]
-    : '';
-  const heroThumb = getImageUrlFromLink(heroLink);
+  const MAX_RETRIES = 3;
+  let attempt = 0;
+  let isSuccess = false;
+  let lastError = '';
   
-  const aiData = getAIDescription(produkNama, keyword, rowData[4] || '', pData.specs);
-  if (!aiData) return { success: false, error: 'AI gagal membuat deskripsi' };
-  
-  const finalTitle = rowData[1] || aiData.title;
-  const finalHtml = buildModernTemplate({
-    heroImg: heroThumb, heroOriginal: heroLink,
-    kataKunci: keyword, deskripsiAi: aiData.description,
-    tabelAi: aiData.table, gallery: pData.gallery || pData.saranWarna, varian: pData.varian || pData.galleryVarian
-  });
-  
-  const resBlogger = postKeBlogger(finalTitle, finalHtml, labels);
-  
-  if (resBlogger && resBlogger.success) {
-    sheet.getRange(row, 2).setValue(finalTitle);
-    sheet.getRange(row, 7).setValue('Selesai');
-    sheet.getRange(row, 8).setValue(new Date());
-    if (resBlogger.url) sheet.getRange(row, 11).setValue(resBlogger.url);
-    addLog(produkNama, keyword, 'Sukses (Manual)', resBlogger.url || '', '');
-    return { success: true, title: finalTitle, url: resBlogger.url };
+  while (attempt < MAX_RETRIES && !isSuccess) {
+    attempt++;
+    const heroLink = (pData.heroImages && pData.heroImages.length > 0)
+      ? pData.heroImages[Math.floor(Math.random() * pData.heroImages.length)]
+      : '';
+    const heroThumb = getImageUrlFromLink(heroLink);
+    
+    const aiData = getAIDescription(produkNama, keyword, rowData[4] || '', pData.specs);
+    if (!aiData) {
+      lastError = 'AI gagal membuat deskripsi';
+      if (attempt < MAX_RETRIES) Utilities.sleep(2500);
+      continue;
+    }
+    
+    const finalTitle = rowData[1] || aiData.title;
+    const finalHtml = buildModernTemplate({
+      heroImg: heroThumb, heroOriginal: heroLink,
+      kataKunci: keyword, deskripsiAi: aiData.description,
+      tabelAi: aiData.table, gallery: pData.gallery || pData.saranWarna, varian: pData.varian || pData.galleryVarian
+    });
+    
+    const resBlogger = postKeBlogger(finalTitle, finalHtml, labels);
+    
+    if (resBlogger && resBlogger.success) {
+      isSuccess = true;
+      sheet.getRange(row, 2).setValue(finalTitle);
+      sheet.getRange(row, 7).setValue('Selesai');
+      sheet.getRange(row, 8).setValue(new Date());
+      if (resBlogger.url) sheet.getRange(row, 11).setValue(resBlogger.url);
+      const retryTag = attempt > 1 ? ` (Retry ke-${attempt})` : '';
+      addLog(produkNama, keyword, 'Sukses (Manual)' + retryTag, resBlogger.url || '', '');
+      return { success: true, title: finalTitle, url: resBlogger.url };
+    } else {
+      lastError = resBlogger ? (resBlogger.error || 'Blogger error') : 'Gagal post ke Blogger';
+      if (attempt < MAX_RETRIES) Utilities.sleep(2500);
+    }
   }
   
-  const errDetail = resBlogger ? (resBlogger.error || 'Blogger error') : 'Gagal post ke Blogger';
-  addLog(produkNama, keyword, 'Gagal (Manual)', '', errDetail);
-  return { success: false, error: errDetail };
+  sheet.getRange(row, 7).setValue('Gagal');
+  addLog(produkNama, keyword, 'Gagal (Manual 3x Coba)', '', lastError);
+  return { success: false, error: lastError };
 }
 
 function previewPost(produkNama, keyword, row) {
