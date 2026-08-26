@@ -88,6 +88,8 @@ function doPost(e) {
       case 'saveMasterKeywords': result = saveMasterKeywords(data.produkId, data.keywords); break;
       case 'generateKeywords': result = generateKeywordsFromMaster(data.produkId, data.count); break;
       case 'refreshAllKeywords': result = refreshAllKeywords(); break;
+      case 'cleanOldLogs': result = { success: true, count: cleanOldLogs() }; break;
+      case 'sortLogs': result = { success: true, result: sortLogsNewestFirst() }; break;
       case 'uploadImage': result = uploadImage(data.name, data.type, data.base64, data.folderId); break;
       default: result = { success: false, error: 'Aksi tidak dikenali: ' + action }; break;
     }
@@ -332,12 +334,18 @@ function saveMasterKeywords(produkId, keywords) {
     }
   }
   
-  // Tambah yang baru
+  // Tambah yang baru di baris teratas (Baris 2)
+  const newRows = [];
   keywords.forEach(kw => {
     if (kw && String(kw).trim()) {
-      sheet.appendRow([produkId, String(kw).trim(), new Date()]);
+      newRows.push([produkId, String(kw).trim(), new Date()]);
     }
   });
+  
+  if (newRows.length > 0) {
+    sheet.insertRowsBefore(2, newRows.length);
+    sheet.getRange(2, 1, newRows.length, 3).setValues(newRows);
+  }
   
   return { success: true };
 }
@@ -397,16 +405,20 @@ function generateKeywordsFromMaster(produkId, count) {
   }
   
   const targetSheet = ss.getSheetByName(sheetName);
-  let added = 0;
+  const newRows = [];
   newKeywords.forEach(kw => {
     if (!existingKeywords.has(kw.toLowerCase().trim())) {
-      targetSheet.appendRow([kw, '', '', '', '', defaultLabel || '', '', '', '', '', '']);
+      newRows.push([kw, '', '', '', '', defaultLabel || '', '', '', '', '', '']);
       existingKeywords.add(kw.toLowerCase().trim());
-      added++;
     }
   });
   
-  return { success: true, generated: newKeywords.length, added: added, keywords: newKeywords };
+  if (newRows.length > 0) {
+    targetSheet.insertRowsBefore(2, newRows.length);
+    targetSheet.getRange(2, 1, newRows.length, 11).setValues(newRows);
+  }
+  
+  return { success: true, generated: newKeywords.length, added: newRows.length, keywords: newKeywords };
 }
 
 function generateKeywordsAI(produkNama, masterKeywords, count, existingSet, produkDeskripsi, specs) {
@@ -570,6 +582,10 @@ function refreshAllKeywords() {
     }
   }
   
+  // Urutkan dan bersihkan log lama (> 1 tahun) otomatis setiap tengah malam
+  sortLogsNewestFirst();
+  cleanOldLogs();
+  
   console.log(`🌙 SELESAI. Total keyword baru: ${totalGenerated}`);
 }
 
@@ -628,7 +644,10 @@ function addProduk(nama, deskripsi, prioritas, masterKeywords, heroImages, varia
   
   const id = 'PRD_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMddHHmmss');
   const labelStr = Array.isArray(labels) ? labels.join(', ') : String(labels || '').trim();
-  sheet.appendRow([id, nama, deskripsi || '', 'Aktif', prioritas || 5, new Date(), labelStr]);
+  
+  // Masukkan produk baru di baris teratas (Baris 2)
+  sheet.insertRowBefore(2);
+  sheet.getRange(2, 1, 1, 7).setValues([[id, nama, deskripsi || '', 'Aktif', prioritas || 5, new Date(), labelStr]]);
   
   // Simpan master keywords
   if (masterKeywords && masterKeywords.length > 0) {
@@ -895,7 +914,9 @@ function addKeyword(sheetName, keyword, label, spec) {
     }
   }
   
-  sheet.appendRow([keyword, '', '', '', '', label || '', '', '', spec || '', '', '']);
+  // Masukkan keyword baru di baris teratas (Baris 2)
+  sheet.insertRowBefore(2);
+  sheet.getRange(2, 1, 1, 11).setValues([[keyword, '', '', '', '', label || '', '', '', spec || '', '', '']]);
   return { success: true };
 }
 
@@ -911,16 +932,20 @@ function importKeywords(sheetName, keywordsArray) {
     if (data[i][0]) existing.add(String(data[i][0]).toLowerCase().trim());
   }
   
-  let added = 0;
+  const newRows = [];
   keywordsArray.forEach(kw => {
     if (kw && String(kw).trim() && !existing.has(String(kw).toLowerCase().trim())) {
-      sheet.appendRow([String(kw).trim(), '', '', '', '', '', '', '', '', '', '']);
+      newRows.push([String(kw).trim(), '', '', '', '', '', '', '', '', '', '']);
       existing.add(String(kw).toLowerCase().trim());
-      added++;
     }
   });
   
-  return { success: true, count: added };
+  if (newRows.length > 0) {
+    sheet.insertRowsBefore(2, newRows.length);
+    sheet.getRange(2, 1, newRows.length, 11).setValues(newRows);
+  }
+  
+  return { success: true, count: newRows.length };
 }
 
 function deleteKeyword(sheetName, row) {
@@ -1120,18 +1145,23 @@ function getStatsRange(start, end, type) {
   };
 }
 
-// ==================== LOG ====================
+// ==================== LOG (INPUT BARU DI ATAS / NEWEST FIRST) ====================
 
 function getLog(limit) {
   const ss = getSS();
   let sheet = ss.getSheetByName('LOG_POSTING');
   if (!sheet) return [];
   
-  const data = sheet.getDataRange().getValues();
-  const logs = [];
-  const start = Math.max(1, data.length - limit);
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return [];
   
-  for (let i = data.length - 1; i >= start; i--) {
+  // Baca langsung dari baris teratas (Baris 2 ke bawah) secara instan & ringan
+  const maxRows = Math.min(lastRow - 1, limit || 50);
+  const data = sheet.getRange(2, 1, maxRows, 6).getValues();
+  const logs = [];
+  
+  for (let i = 0; i < data.length; i++) {
+    if (!data[i][0]) continue;
     logs.push({
       timestamp: data[i][0],
       produk: data[i][1],
@@ -1155,7 +1185,74 @@ function addLog(produk, keyword, status, url, error) {
     sheet = ss.insertSheet('LOG_POSTING');
     sheet.appendRow(['Timestamp', 'Produk', 'Keyword', 'Status', 'URL', 'Error']);
   }
-  sheet.appendRow([new Date(), produk, keyword, status, url || '', error || '']);
+  
+  // Masukkan log baru di baris paling atas (Baris 2, tepat di bawah header)
+  sheet.insertRowBefore(2);
+  sheet.getRange(2, 1, 1, 6).setValues([[new Date(), produk, keyword, status, url || '', error || '']]);
+  
+  // Auto-clean berkala untuk menghapus log > 1 tahun (dieksekusi ringan 1 dari 10 kali posting)
+  if (Math.random() < 0.1) {
+    cleanOldLogs(sheet);
+  }
+}
+
+function cleanOldLogs(sheetObj) {
+  try {
+    const ss = getSS();
+    const sheet = sheetObj || ss.getSheetByName('LOG_POSTING');
+    if (!sheet) return 0;
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 50) return 0; // Tidak perlu cek jika baris masih sedikit
+    
+    const oneYearAgo = new Date();
+    oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+    
+    // Karena log disusun baru di atas (baris 2) dan lama di bawah,
+    // kita periksa baris dari bawah ke atas
+    const timestamps = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    let deleteCount = 0;
+    
+    for (let i = timestamps.length - 1; i >= 0; i--) {
+      const val = timestamps[i][0];
+      if (!val) {
+        deleteCount++;
+        continue;
+      }
+      const d = new Date(val);
+      if (!isNaN(d.getTime()) && d < oneYearAgo) {
+        deleteCount++;
+      } else if (!isNaN(d.getTime()) && d >= oneYearAgo) {
+        break; // Berhenti begitu data < 1 tahun ditemukan
+      }
+    }
+    
+    if (deleteCount > 0) {
+      const startRow = lastRow - deleteCount + 1;
+      sheet.deleteRows(startRow, deleteCount);
+      console.log(`🧹 Auto-clean: Berhasil menghapus ${deleteCount} baris log lama (> 1 tahun)`);
+      return deleteCount;
+    }
+    return 0;
+  } catch(e) {
+    console.warn("cleanOldLogs warning: " + e);
+    return 0;
+  }
+}
+
+function sortLogsNewestFirst() {
+  try {
+    const ss = getSS();
+    const sheet = ss.getSheetByName('LOG_POSTING');
+    if (!sheet) return;
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 2) return;
+    
+    // Sort baris 2 s/d baris terakhir secara Descending berdasarkan kolom Timestamp (Kolom 1)
+    sheet.getRange(2, 1, lastRow - 1, 6).sort({ column: 1, ascending: false });
+  } catch(e) {
+    console.warn("sortLogsNewestFirst error: " + e);
+  }
 }
 
 // ==================== SMART QUEUE (ROTASI PRODUK) ====================
