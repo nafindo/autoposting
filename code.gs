@@ -1181,16 +1181,19 @@ function getQueue() {
   for (let i = 1; i < produkData.length; i++) {
     if (produkData[i][3] === 'Nonaktif') continue;
     
+    const produkId = produkData[i][0];
     const produkNama = produkData[i][1];
     const sheetName = 'PRODUK_' + String(produkNama).replace(/\s+/g, '_').substring(0, 20);
     const pSheet = ss.getSheetByName(sheetName);
     if (!pSheet) continue;
     
-    const pData = pSheet.getDataRange().getValues();
+    let pData = pSheet.getDataRange().getValues();
+    let productQueue = [];
+    
     for (let j = 1; j < pData.length; j++) {
       if (pData[j][0] && pData[j][6] !== 'Selesai' && pData[j][6] !== 'Gagal') {
-        queue.push({
-          produkId: produkData[i][0],
+        productQueue.push({
+          produkId: produkId,
           produkNama: produkNama,
           sheetName: sheetName,
           row: j + 1,
@@ -1199,13 +1202,42 @@ function getQueue() {
           keterangan: pData[j][4] || '',
           labelRaw: pData[j][5] || '',
           prioritas: produkData[i][4] || 5,
-          todayCount: todayPosts[produkNama] || 0  // Untuk fair rotation
+          todayCount: todayPosts[produkNama] || 0
         });
       }
     }
+    
+    // AUTO-REFILL OTOMATIS: Jika keyword yang tersisa < 5, generate 50 keyword baru secara instan
+    if (productQueue.length < 5) {
+      console.log(`⚡ Sisa keyword untuk "${produkNama}" menipis (${productQueue.length} tersisa). Auto-generating 50 keyword baru...`);
+      const refillRes = generateKeywordsFromMaster(produkId, 50);
+      if (refillRes && refillRes.success && refillRes.added > 0) {
+        // Ambil data terbaru setelah auto-refill
+        pData = pSheet.getDataRange().getValues();
+        productQueue = [];
+        for (let j = 1; j < pData.length; j++) {
+          if (pData[j][0] && pData[j][6] !== 'Selesai' && pData[j][6] !== 'Gagal') {
+            productQueue.push({
+              produkId: produkId,
+              produkNama: produkNama,
+              sheetName: sheetName,
+              row: j + 1,
+              keyword: pData[j][0],
+              judul: pData[j][1],
+              keterangan: pData[j][4] || '',
+              labelRaw: pData[j][5] || '',
+              prioritas: produkData[i][4] || 5,
+              todayCount: todayPosts[produkNama] || 0
+            });
+          }
+        }
+      }
+    }
+    
+    queue.push(...productQueue);
   }
   
-  // Sort: prioritas rendah dulu, lalu yang paling sedikit diposting hari ini (fair rotation)
+  // Sort: yang paling sedikit diposting hari ini dulu, lalu prioritas (1 = VIP)
   queue.sort((a, b) => {
     if (a.todayCount !== b.todayCount) return a.todayCount - b.todayCount;
     return a.prioritas - b.prioritas;
