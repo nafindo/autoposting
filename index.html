@@ -569,10 +569,12 @@
             </div>
 
             <!-- Testing Buttons FB Page & IG -->
-            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center;">
+              <button type="button" class="btn btn-outline" style="font-size:12px;color:#0d8af0;border-color:#0d8af0;" onclick="diagnosaMetaAPI()"><i class="fas fa-stethoscope"></i> 🔍 Cek Koneksi & Diagnosa Meta API</button>
               <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostFacebook()"><i class="fab fa-facebook"></i> Test Post FB Page</button>
               <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostInstagram()"><i class="fab fa-instagram"></i> Test Post Instagram</button>
             </div>
+            <div id="metaDiagnosticBox" style="display:none;margin-top:14px;background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:14px;font-size:12px;line-height:1.6;"></div>
           </div>
         </div>
 
@@ -2309,6 +2311,69 @@
         showToast('Pengaturan disimpan!', 'success');
         loadDashboard();
       } catch(e) { showToast('Gagal simpan: ' + e.message, 'error'); }
+    }
+
+    async function diagnosaMetaAPI() {
+      const box = document.getElementById('metaDiagnosticBox');
+      if (box) {
+        box.style.display = 'block';
+        box.innerHTML = '<div style="color:var(--primary);"><i class="fas fa-spinner fa-spin"></i> Sedang memeriksa token dan izin ke Meta Graph API...</div>';
+      }
+      try {
+        const res = await apiPost('diagnosaMeta', {});
+        if (!res.success) {
+          box.innerHTML = `
+            <div style="color:#d32f2f;font-weight:600;margin-bottom:6px;"><i class="fas fa-times-circle"></i> Hasil Diagnosa: Gagal</div>
+            <div style="background:#fde8e8;border-left:3px solid #d32f2f;padding:8px 12px;border-radius:4px;color:#c53030;">
+              ${res.error || 'Token tidak valid'}
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:#666;">
+              💡 <strong>Solusi:</strong> Pastikan Anda menggunakan <strong>Page Access Token</strong> yang valid dari Graph API Explorer, bukan User Token biasa.
+            </div>
+          `;
+          return;
+        }
+        
+        const rep = res.report;
+        const perms = rep.permissions || [];
+        const hasManagePosts = perms.includes('pages_manage_posts');
+        const hasReadEngage = perms.includes('pages_read_engagement');
+        const hasIgPublish = perms.includes('instagram_content_publish');
+        
+        let html = `
+          <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e0e0e0;padding-bottom:8px;margin-bottom:10px;">
+            <strong style="font-size:13px;color:#1976d2;"><i class="fas fa-clipboard-check"></i> Hasil Diagnosa Akun Meta API</strong>
+            <button class="btn btn-outline btn-sm" style="font-size:10px;padding:2px 8px;" onclick="document.getElementById('metaDiagnosticBox').style.display='none'">Tutup</button>
+          </div>
+          
+          <div style="margin-bottom:8px;">
+            <strong>1. Status Token:</strong> 
+            <span style="color:#2e7d32;font-weight:600;">✅ Aktif & Valid</span> 
+            <span style="color:#666;">("${rep.tokenName || 'Valid'}", ID: ${rep.tokenId || '-'})</span>
+          </div>
+
+          <div style="margin-bottom:8px;">
+            <strong>2. Izin (Permissions) Token:</strong><br>
+            <span style="display:inline-block;padding:2px 6px;margin:2px;border-radius:4px;font-size:11px;background:${hasManagePosts ? '#e8f5e9;color:#2e7d32' : '#ffebee;color:#c62828'}">${hasManagePosts ? '✅' : '❌'} pages_manage_posts</span>
+            <span style="display:inline-block;padding:2px 6px;margin:2px;border-radius:4px;font-size:11px;background:${hasReadEngage ? '#e8f5e9;color:#2e7d32' : '#ffebee;color:#c62828'}">${hasReadEngage ? '✅' : '❌'} pages_read_engagement</span>
+            <span style="display:inline-block;padding:2px 6px;margin:2px;border-radius:4px;font-size:11px;background:${hasIgPublish ? '#e8f5e9;color:#2e7d32' : '#fff3e0;color:#ef6c00'}">${hasIgPublish ? '✅' : '⚠️'} instagram_content_publish</span>
+          </div>
+
+          <div style="margin-bottom:8px;">
+            <strong>3. Halaman Facebook (Page):</strong> 
+            ${rep.pageFound ? `<span style="color:#2e7d32;font-weight:600;">✅ Terhubung: "${rep.pageName}" (ID: ${rep.pageId})</span>` : `<span style="color:#c62828;font-weight:600;">❌ Gagal Terhubung (${rep.pageError || 'ID Halaman tidak cocok dengan token'})</span>`}
+          </div>
+
+          <div style="margin-bottom:8px;">
+            <strong>4. Akun Instagram Bisnis:</strong> 
+            ${rep.igFound ? `<span style="color:#2e7d32;font-weight:600;">✅ Terhubung: @${rep.igUsername}</span>` : (rep.connectedIgId ? `<span style="color:#ef6c00;">ℹ️ Ditemukan ID IG dari Halaman (${rep.connectedIgId}). Salin ID ini ke kolom IG Account ID.</span>` : `<span style="color:#666;">ℹ️ ${rep.igError || 'Belum diisi / belum terhubung'}</span>`)}
+          </div>
+        `;
+        
+        box.innerHTML = html;
+      } catch(e) {
+        box.innerHTML = `<div style="color:#d32f2f;">Error diagnosa: ${e.message}</div>`;
+      }
     }
 
     async function testPostFacebook() {

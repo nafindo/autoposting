@@ -106,6 +106,7 @@ function doPost(e) {
       case 'testFacebook': result = testFacebookPost(); break;
       case 'testInstagram': result = testInstagramPost(); break;
       case 'testFacebookGroup': result = testFacebookGroupPost(); break;
+      case 'diagnosaMeta': result = diagnosaMetaToken(); break;
       case 'uploadImage': result = uploadImage(data.name, data.type, data.base64, data.folderId); break;
       default: result = { success: false, error: 'Aksi tidak dikenali: ' + action }; break;
     }
@@ -2205,6 +2206,117 @@ function testDriveAuth() {
 
 // ==================== META (FACEBOOK & INSTAGRAM) API ====================
 
+function diagnosaMetaToken() {
+  const config = getConfig();
+  const pageId = String(config.FB_PAGE_ID || '').trim();
+  const pageToken = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
+  const igId = String(config.IG_ACCOUNT_ID || '').trim();
+  const groupIds = String(config.FB_GROUP_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
+  
+  if (!pageToken) {
+    return { success: false, error: 'Meta Page Access Token belum diisi di Pengaturan.' };
+  }
+  
+  const report = {
+    tokenValid: false,
+    tokenType: 'Unknown',
+    tokenName: '',
+    tokenId: '',
+    permissions: [],
+    pageFound: false,
+    pageName: '',
+    pageId: pageId,
+    pageError: '',
+    connectedIgId: '',
+    igFound: false,
+    igUsername: '',
+    igError: '',
+    groupsStatus: []
+  };
+  
+  try {
+    // 1. Cek Token info via /me
+    const meRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/me?access_token=${encodeURIComponent(pageToken)}`, { muteHttpExceptions: true });
+    const meJson = JSON.parse(meRes.getContentText());
+    
+    if (meJson.error) {
+      return {
+        success: false,
+        error: `Token Tidak Valid / Expired: ${meJson.error.message} (Kode: ${meJson.error.code})`
+      };
+    }
+    
+    report.tokenValid = true;
+    report.tokenName = meJson.name || 'Valid Token';
+    report.tokenId = meJson.id;
+    
+    // 2. Cek Izin / Permissions token via /me/permissions
+    try {
+      const permRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/me/permissions?access_token=${encodeURIComponent(pageToken)}`, { muteHttpExceptions: true });
+      const permJson = JSON.parse(permRes.getContentText());
+      if (permJson.data) {
+        report.permissions = permJson.data.filter(p => p.status === 'granted').map(p => p.permission);
+      }
+    } catch(e) {}
+    
+    // 3. Cek Page ID via /{pageId}
+    if (pageId) {
+      try {
+        const pageRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${pageId}?fields=name,id,is_published,instagram_business_account&access_token=${encodeURIComponent(pageToken)}`, { muteHttpExceptions: true });
+        const pageJson = JSON.parse(pageRes.getContentText());
+        if (!pageJson.error && pageJson.id) {
+          report.pageFound = true;
+          report.pageName = pageJson.name;
+          if (pageJson.instagram_business_account) {
+            report.connectedIgId = pageJson.instagram_business_account.id;
+          }
+        } else {
+          report.pageError = pageJson.error ? pageJson.error.message : 'Page ID tidak cocok atau tidak ditemukan';
+        }
+      } catch(e) {
+        report.pageError = e.toString();
+      }
+    }
+    
+    // 4. Cek IG ID via /{igId}
+    if (igId) {
+      try {
+        const igRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${igId}?fields=username,name&access_token=${encodeURIComponent(pageToken)}`, { muteHttpExceptions: true });
+        const igJson = JSON.parse(igRes.getContentText());
+        if (!igJson.error && igJson.id) {
+          report.igFound = true;
+          report.igUsername = igJson.username || igJson.name || 'Connected';
+        } else {
+          report.igError = igJson.error ? igJson.error.message : 'IG Account ID tidak valid atau belum terhubung';
+        }
+      } catch(e) {
+        report.igError = e.toString();
+      }
+    }
+    
+    // 5. Cek FB Groups
+    if (groupIds.length > 0) {
+      report.groupsStatus = groupIds.map(gId => {
+        try {
+          const gRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${gId}?fields=name,id&access_token=${encodeURIComponent(pageToken)}`, { muteHttpExceptions: true });
+          const gJson = JSON.parse(gRes.getContentText());
+          if (!gJson.error && gJson.id) {
+            return { id: gId, name: gJson.name, status: 'OK' };
+          } else {
+            return { id: gId, name: '', status: 'Error', error: gJson.error ? gJson.error.message : 'Grup tidak dapat diakses' };
+          }
+        } catch(eg) {
+          return { id: gId, status: 'Error', error: eg.toString() };
+        }
+      });
+    }
+    
+    return { success: true, report: report };
+  } catch(e) {
+    return { success: false, error: e.toString() };
+  }
+}
+
 function postKeFacebook(caption, imageUrl, linkUrl) {
   const config = getConfig();
   const pageId = String(config.FB_PAGE_ID || '').trim();
@@ -2214,36 +2326,54 @@ function postKeFacebook(caption, imageUrl, linkUrl) {
     return { success: false, error: 'Facebook Page ID atau Access Token belum diisi di Pengaturan' };
   }
   
-  try {
-    let url = '';
-    let payload = {};
-    
-    // Jika ada gambar produk publik
-    if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
-      url = `https://graph.facebook.com/v19.0/${pageId}/photos`;
-      payload = {
-        url: imageUrl,
-        caption: caption || '',
-        access_token: pageToken
-      };
-    } else {
-      url = `https://graph.facebook.com/v19.0/${pageId}/feed`;
-      payload = {
-        message: caption || '',
-        access_token: pageToken
-      };
-      if (linkUrl) payload.link = linkUrl;
+  let finalMessage = caption || '';
+  if (linkUrl && !finalMessage.includes(linkUrl)) {
+    finalMessage = finalMessage.trim() + '\n\n🌐 ' + linkUrl;
+  }
+  
+  // Opsi 1: Coba upload Foto jika ada imageUrl publik
+  if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+    try {
+      const photoUrl = `https://graph.facebook.com/v19.0/${pageId}/photos`;
+      const photoRes = UrlFetchApp.fetch(photoUrl, {
+        method: 'post',
+        payload: {
+          url: imageUrl,
+          caption: finalMessage,
+          access_token: pageToken
+        },
+        muteHttpExceptions: true
+      });
+      
+      const pCode = photoRes.getResponseCode();
+      const pText = photoRes.getContentText();
+      const pJson = JSON.parse(pText);
+      
+      if (!pJson.error && (pJson.id || pJson.post_id)) {
+        const postId = pJson.post_id || pJson.id;
+        return { success: true, id: postId, url: `https://www.facebook.com/${postId}` };
+      }
+      
+      console.warn(`Post photo FB Page gagal (${pCode}): ${pText}. Mencoba fallback ke postingan feed teks...`);
+    } catch(ePhoto) {
+      console.warn(`Exception post photo: ${ePhoto}. Mencoba fallback ke feed...`);
     }
-    
-    const res = UrlFetchApp.fetch(url, {
+  }
+  
+  // Opsi 2 (atau Fallback): Post ke Feed Halaman
+  try {
+    const feedUrl = `https://graph.facebook.com/v19.0/${pageId}/feed`;
+    const feedRes = UrlFetchApp.fetch(feedUrl, {
       method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(payload),
+      payload: {
+        message: finalMessage,
+        access_token: pageToken
+      },
       muteHttpExceptions: true
     });
     
-    const code = res.getResponseCode();
-    const text = res.getContentText();
+    const code = feedRes.getResponseCode();
+    const text = feedRes.getContentText();
     const json = JSON.parse(text);
     
     if (code >= 300 || json.error) {
@@ -2278,12 +2408,11 @@ function postKeInstagram(caption, imageUrl) {
     const containerUrl = `https://graph.facebook.com/v19.0/${igAccountId}/media`;
     const containerRes = UrlFetchApp.fetch(containerUrl, {
       method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify({
+      payload: {
         image_url: imageUrl,
         caption: caption || '',
         access_token: token
-      }),
+      },
       muteHttpExceptions: true
     });
     
@@ -2306,11 +2435,10 @@ function postKeInstagram(caption, imageUrl) {
     const publishUrl = `https://graph.facebook.com/v19.0/${igAccountId}/media_publish`;
     const publishRes = UrlFetchApp.fetch(publishUrl, {
       method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify({
+      payload: {
         creation_id: creationId,
         access_token: token
-      }),
+      },
       muteHttpExceptions: true
     });
     
@@ -2434,35 +2562,46 @@ function postKeFacebookGroup(caption, imageUrl, linkUrl, specificGroupId) {
     return { success: false, error: 'Facebook Group ID atau Access Token belum diisi di Pengaturan' };
   }
   
+  let finalMessage = caption || '';
+  if (linkUrl && !finalMessage.includes(linkUrl)) {
+    finalMessage = finalMessage.trim() + '\n\n🌐 ' + linkUrl;
+  }
+  
   try {
-    let url = '';
-    let payload = {};
-    
     if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
-      url = `https://graph.facebook.com/v19.0/${targetGroupId}/photos`;
-      payload = {
-        url: imageUrl,
-        caption: caption || '',
-        access_token: token
-      };
-    } else {
-      url = `https://graph.facebook.com/v19.0/${targetGroupId}/feed`;
-      payload = {
-        message: caption || '',
-        access_token: token
-      };
-      if (linkUrl) payload.link = linkUrl;
+      try {
+        const photoUrl = `https://graph.facebook.com/v19.0/${targetGroupId}/photos`;
+        const photoRes = UrlFetchApp.fetch(photoUrl, {
+          method: 'post',
+          payload: {
+            url: imageUrl,
+            caption: finalMessage,
+            access_token: token
+          },
+          muteHttpExceptions: true
+        });
+        const pJson = JSON.parse(photoRes.getContentText());
+        if (!pJson.error && (pJson.id || pJson.post_id)) {
+          const postId = pJson.post_id || pJson.id;
+          saveFbGroupPostHistory(targetGroupId);
+          return { success: true, groupId: targetGroupId, id: postId, url: `https://www.facebook.com/groups/${targetGroupId}/posts/${postId}` };
+        }
+      } catch(ePhoto) {}
     }
     
-    const res = UrlFetchApp.fetch(url, {
+    // Fallback ke feed grup
+    const feedUrl = `https://graph.facebook.com/v19.0/${targetGroupId}/feed`;
+    const feedRes = UrlFetchApp.fetch(feedUrl, {
       method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(payload),
+      payload: {
+        message: finalMessage,
+        access_token: token
+      },
       muteHttpExceptions: true
     });
     
-    const code = res.getResponseCode();
-    const text = res.getContentText();
+    const code = feedRes.getResponseCode();
+    const text = feedRes.getContentText();
     const json = JSON.parse(text);
     
     if (code >= 300 || json.error) {
@@ -2471,25 +2610,28 @@ function postKeFacebookGroup(caption, imageUrl, linkUrl, specificGroupId) {
       return { success: false, groupId: targetGroupId, error: errMsg };
     } else {
       const postId = json.post_id || json.id;
-      
-      // Catat waktu sukses posting ke grup spesifik ini di riwayat rolling
-      const props = PropertiesService.getScriptProperties();
-      const nowTs = new Date().toISOString();
-      let history = {};
-      try {
-        history = JSON.parse(props.getProperty('FB_GROUP_HISTORY') || '{}');
-      } catch(e) {
-        history = {};
-      }
-      history[targetGroupId] = nowTs;
-      props.setProperty('FB_GROUP_HISTORY', JSON.stringify(history));
-      props.setProperty('LAST_FB_GROUP_POST_TIME', nowTs);
-      
+      saveFbGroupPostHistory(targetGroupId);
       return { success: true, groupId: targetGroupId, id: postId, url: `https://www.facebook.com/groups/${targetGroupId}/posts/${postId}` };
     }
   } catch(e) {
     return { success: false, groupId: targetGroupId, error: e.toString() };
   }
+}
+
+function saveFbGroupPostHistory(targetGroupId) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const nowTs = new Date().toISOString();
+    let history = {};
+    try {
+      history = JSON.parse(props.getProperty('FB_GROUP_HISTORY') || '{}');
+    } catch(e) {
+      history = {};
+    }
+    history[targetGroupId] = nowTs;
+    props.setProperty('FB_GROUP_HISTORY', JSON.stringify(history));
+    props.setProperty('LAST_FB_GROUP_POST_TIME', nowTs);
+  } catch(e) {}
 }
 
 function testFacebookGroupPost() {
