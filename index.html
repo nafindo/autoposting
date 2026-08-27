@@ -507,19 +507,16 @@
           </div>
         </div>
 
-        <!-- PENGATURAN MULTI-CHANNEL (BLOGGER, FACEBOOK, INSTAGRAM) -->
+        <!-- PENGATURAN 1: FACEBOOK PAGE & INSTAGRAM BISNIS -->
         <div class="card">
           <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
-            <h3>📱 Pengaturan Multi-Channel & Anti-Spam (Facebook & Instagram)</h3>
-            <span class="badge" style="background:#e8f0fe;color:var(--primary);font-size:11px;">Cross-Posting Terisolasi & Anti-Ban</span>
+            <h3>📱 Pengaturan Facebook Page & Instagram Bisnis</h3>
+            <span class="badge" style="background:#e8f0fe;color:var(--primary);font-size:11px;">Cross-Posting Otomatis</span>
           </div>
           <div class="card-body">
-            <!-- Anti-Spam Notice Alert -->
-            <div style="background:#e8f4fd;border:1px solid #b6e0fe;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#035388;line-height:1.5;">
-              <strong style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:13px;"><i class="fas fa-shield-alt"></i> Protokol Anti-Spam & Keamanan Akun Multi-Platform</strong>
-              Blogger memposting secara reguler. Agar Facebook & Instagram tidak memblokir akun Anda, postingan <strong>FB Page & Instagram dibatasi (3–8 post/hari)</strong> dengan jeda sebar alami (1–2 jam). 
-              Khusus <strong>Facebook Group</strong>, sistem hanya memposting <strong>1x setiap 2–4 hari pada jam acak</strong> dengan sistem giliran grup (Round-Robin) untuk menghindari deteksi spam atau dikeluarkan oleh admin grup.
-            </div>
+            <p style="font-size:12px;color:var(--text-sec);margin-bottom:16px;">
+              Promosikan konten secara otomatis ke Halaman Facebook dan Instagram Bisnis resmi Anda.
+            </p>
 
             <!-- Checkbox Saklar Platform -->
             <div style="display:flex;gap:20px;flex-wrap:wrap;background:#f8f9fa;padding:14px;border-radius:8px;margin-bottom:16px;border:1px solid #e0e0e0;">
@@ -535,10 +532,6 @@
                 <input type="checkbox" id="cfgPostIg" style="width:18px;height:18px;cursor:pointer;">
                 <i class="fab fa-instagram" style="color:#e4405f;font-size:18px;"></i> Instagram Bisnis
               </label>
-              <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;user-select:none;">
-                <input type="checkbox" id="cfgPostFbGroup" style="width:18px;height:18px;cursor:pointer;">
-                <i class="fas fa-users" style="color:#0d8af0;font-size:18px;"></i> Facebook Group
-              </label>
             </div>
 
             <!-- Meta Configuration Form -->
@@ -546,7 +539,7 @@
               <div class="form-group">
                 <label><i class="fab fa-facebook" style="color:#1877f2;"></i> Facebook Page ID</label>
                 <input type="text" class="form-control" id="cfgFbPageId" placeholder="Contoh: 104829104928172">
-                <small style="color:#888">ID Halaman Facebook (dapat dilihat pada menu 'About / Tentang' Page)</small>
+                <small style="color:#888">ID Halaman Facebook (menu 'About / Tentang' Page)</small>
               </div>
               <div class="form-group">
                 <label><i class="fab fa-instagram" style="color:#e4405f;"></i> Instagram Business Account ID</label>
@@ -556,52 +549,80 @@
             </div>
 
             <div class="form-group">
-              <label><i class="fas fa-users" style="color:#0d8af0;"></i> Facebook Group ID(s) <small style="font-weight:normal;color:#888">(Pisah dengan koma atau baris baru jika lebih dari 1)</small></label>
-              <input type="text" class="form-control" id="cfgFbGroupId" placeholder="Contoh: 123456789012345, 987654321098765">
-              <small style="color:#888">Sistem otomatis merotasi postingan ke 1 grup per jadwal (Round-Robin) agar aman</small>
-            </div>
-
-            <div class="form-group">
               <label><i class="fas fa-key" style="color:var(--primary);"></i> Meta Page Access Token (Long-Lived Token)</label>
               <input type="password" class="form-control" id="cfgFbToken" placeholder="EAA...">
               <small style="color:#888">Token akses Page dari Meta Graph API Explorer (permission: pages_manage_posts, pages_read_engagement, instagram_basic, instagram_content_publish)</small>
             </div>
 
-            <!-- Anti-Spam & Quota Tuning -->
-            <div style="margin-top:14px;padding-top:14px;border-top:1px dashed #e0e0e0;">
-              <h4 style="font-size:13px;margin-bottom:12px;color:var(--text);display:flex;align-items:center;gap:6px;">
-                <i class="fas fa-sliders-h" style="color:var(--primary);"></i> Batas Kuota & Frekuensi Posting Sosial Media
-              </h4>
-              <div class="form-row">
-                <div class="form-group">
-                  <label><i class="fab fa-facebook" style="color:#1877f2;"></i> Batas Harian FB Page (Post/Hari)</label>
-                  <input type="number" class="form-control" id="cfgMaxFbPost" min="1" max="10" value="5">
-                  <small style="color:#888">Saran aman: 3 - 8 post/hari (jeda 1-2 jam)</small>
-                </div>
-                <div class="form-group">
-                  <label><i class="fab fa-instagram" style="color:#e4405f;"></i> Batas Harian Instagram (Post/Hari)</label>
-                  <input type="number" class="form-control" id="cfgMaxIgPost" min="1" max="10" value="5">
-                  <small style="color:#888">Saran aman: 3 - 8 post/hari (jeda 1-2 jam)</small>
-                </div>
-                <div class="form-group">
-                  <label><i class="fas fa-users" style="color:#0d8af0;"></i> Frekuensi Post Facebook Group</label>
-                  <select class="form-control" id="cfgFbGroupInterval">
-                    <option value="2">1x Setiap 2 Hari Sekali</option>
-                    <option value="3" selected>1x Setiap 3 Hari Sekali (Paling Aman)</option>
-                    <option value="4">1x Setiap 4 Hari Sekali</option>
-                    <option value="5">1x Setiap 5 Hari Sekali</option>
-                    <option value="7">1x Seminggu Sekali</option>
-                  </select>
-                  <small style="color:#888">Diposting jam acak, 1 post per hari jadwal</small>
-                </div>
+            <!-- Quota Tuning FB & IG -->
+            <div class="form-row" style="background:#f8f9fa;padding:12px;border-radius:8px;border:1px dashed #d2e3fc;margin-top:10px;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label><i class="fab fa-facebook" style="color:#1877f2;"></i> Batas Harian FB Page (Post/Hari)</label>
+                <input type="number" class="form-control" id="cfgMaxFbPost" min="1" max="10" value="5">
+                <small style="color:#888">Saran aman: 3 - 8 post/hari (jeda 1-2 jam)</small>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label><i class="fab fa-instagram" style="color:#e4405f;"></i> Batas Harian Instagram (Post/Hari)</label>
+                <input type="number" class="form-control" id="cfgMaxIgPost" min="1" max="10" value="5">
+                <small style="color:#888">Saran aman: 3 - 8 post/hari (jeda 1-2 jam)</small>
               </div>
             </div>
 
-            <!-- Testing Buttons -->
+            <!-- Testing Buttons FB Page & IG -->
             <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
               <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostFacebook()"><i class="fab fa-facebook"></i> Test Post FB Page</button>
               <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostInstagram()"><i class="fab fa-instagram"></i> Test Post Instagram</button>
-              <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostFacebookGroup()"><i class="fas fa-users"></i> Test Post FB Group</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PENGATURAN 2: FACEBOOK GROUP (KHUSUS GRUP & ANTI-BAN) -->
+        <div class="card" style="border-left:4px solid #0d8af0;">
+          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+            <h3>👥 Pengaturan Facebook Group (Grup & Komunitas)</h3>
+            <span class="badge" style="background:#e8f4fd;color:#0d8af0;font-size:11px;">Anti-Spam & Anti-Kick Protection</span>
+          </div>
+          <div class="card-body">
+            <!-- Anti-Kick Protection Guide -->
+            <div style="background:#e8f4fd;border:1px solid #b6e0fe;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#035388;line-height:1.5;">
+              <strong style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:13px;"><i class="fas fa-shield-alt"></i> Protokol Anti-Kick & Anti-Spam Grup Facebook</strong>
+              Posting ke grup setiap hari berisiko tinggi membuat akun Anda dikeluarkan admin atau diblokir Facebook. Sistem ini dirancang khusus:
+              <ul style="margin:6px 0 0 18px;padding:0;">
+                <li>Hanya memposting <strong>1x setiap interval hari yang dipilih</strong> (contoh: 1x tiap 3 hari).</li>
+                <li>Waktu posting <strong>diacak secara otomatis</strong> (misal jam 11:24, 14:48, 19:15) agar terlihat seperti manusia.</li>
+                <li>Jika memasukkan banyak Group ID, sistem <strong>merotasi 1 grup per jadwal (Round-Robin)</strong>.</li>
+              </ul>
+            </div>
+
+            <!-- Saklar Aktifkan FB Group -->
+            <div style="background:#f8f9fa;padding:14px;border-radius:8px;margin-bottom:16px;border:1px solid #e0e0e0;">
+              <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;user-select:none;">
+                <input type="checkbox" id="cfgPostFbGroup" style="width:18px;height:18px;cursor:pointer;">
+                <i class="fas fa-users" style="color:#0d8af0;font-size:18px;"></i> Aktifkan Auto-Post ke Facebook Group
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label><i class="fas fa-users" style="color:#0d8af0;"></i> Facebook Group ID(s) <small style="font-weight:normal;color:#888">(Bisa lebih dari 1 ID, pisahkan dengan koma atau baris baru)</small></label>
+              <textarea class="form-control" id="cfgFbGroupId" rows="2" placeholder="Contoh: 123456789012345, 987654321098765"></textarea>
+              <small style="color:#888">Dapatkan ID Grup dari URL grup Facebook Anda (misal: facebook.com/groups/<strong>123456789012345</strong>). Jika diisi banyak ID, sistem akan memposting bergiliran.</small>
+            </div>
+
+            <div class="form-group">
+              <label><i class="fas fa-calendar-alt" style="color:#0d8af0;"></i> Frekuensi Posting ke Facebook Group</label>
+              <select class="form-control" id="cfgFbGroupInterval">
+                <option value="2">1x Setiap 2 Hari Sekali</option>
+                <option value="3" selected>1x Setiap 3 Hari Sekali (Paling Disarankan / Anti-Ban)</option>
+                <option value="4">1x Setiap 4 Hari Sekali</option>
+                <option value="5">1x Setiap 5 Hari Sekali</option>
+                <option value="7">1x Seminggu Sekali</option>
+              </select>
+              <small style="color:#888">Diposting jam acak, maksimal 1 post per hari jadwal.</small>
+            </div>
+
+            <!-- Testing Button FB Group -->
+            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostFacebookGroup()"><i class="fas fa-users"></i> Test Post FB Group Sekarang</button>
             </div>
           </div>
         </div>
