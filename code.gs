@@ -22,13 +22,17 @@ const DEFAULT_CONFIG = {
   FOTO_MODE: 'drive',
   DRIVE_FOLDER_ID: '',
   SPREADSHEET_ID: '',
-  KEYWORD_REFRESH_HOUR: 0,
   POST_TO_BLOGGER: 'true',
   POST_TO_FACEBOOK: 'false',
   POST_TO_INSTAGRAM: 'false',
+  POST_TO_FB_GROUP: 'false',
   FB_PAGE_ID: '',
   FB_PAGE_ACCESS_TOKEN: '',
-  IG_ACCOUNT_ID: ''
+  IG_ACCOUNT_ID: '',
+  FB_GROUP_ID: '',
+  MAX_FB_POST_PER_DAY: 5,
+  MAX_IG_POST_PER_DAY: 5,
+  FB_GROUP_INTERVAL_DAYS: 3
 };
 
 // ==================== WEB APP ====================
@@ -57,6 +61,7 @@ function doGet(e) {
       case 'checkBloggerAuth': result = authorizeBlogger(); break;
       case 'checkDriveAuth': result = testDriveAuth(); break;
       case 'getAllLabels': result = { success: true, labels: getAllLabels() }; break;
+      case 'getPlatformQuota': result = { success: true, data: getPlatformQuotaStatus() }; break;
     }
   } catch(err) {
     result = { success: false, error: err.toString() };
@@ -98,6 +103,7 @@ function doPost(e) {
       case 'sortLogs': result = { success: true, result: sortLogsNewestFirst() }; break;
       case 'testFacebook': result = testFacebookPost(); break;
       case 'testInstagram': result = testInstagramPost(); break;
+      case 'testFacebookGroup': result = testFacebookGroupPost(); break;
       case 'uploadImage': result = uploadImage(data.name, data.type, data.base64, data.folderId); break;
       default: result = { success: false, error: 'Aksi tidak dikenali: ' + action }; break;
     }
@@ -140,7 +146,7 @@ function getConfig() {
   
   const data = sheet.getDataRange().getValues();
   const config = { ...DEFAULT_CONFIG };
-  const numFields = ['MIN_POST_PER_DAY', 'MAX_POST_PER_DAY', 'JAM_AKTIF_MULAI', 'JAM_AKTIF_SELESAI', 'TRIGGER_INTERVAL_MINUTES', 'KEYWORD_REFRESH_HOUR', 'MIN_DELAY_MINUTES', 'MAX_DELAY_MINUTES', 'POSTS_PER_BATCH'];
+  const numFields = ['MIN_POST_PER_DAY', 'MAX_POST_PER_DAY', 'JAM_AKTIF_MULAI', 'JAM_AKTIF_SELESAI', 'TRIGGER_INTERVAL_MINUTES', 'KEYWORD_REFRESH_HOUR', 'MIN_DELAY_MINUTES', 'MAX_DELAY_MINUTES', 'POSTS_PER_BATCH', 'MAX_FB_POST_PER_DAY', 'MAX_IG_POST_PER_DAY', 'FB_GROUP_INTERVAL_DAYS'];
 
   for (let i = 1; i < data.length; i++) {
     const key = String(data[i][0] || '').trim();
@@ -1046,7 +1052,8 @@ function getStats() {
     mode: triggerStatus.mode,
     jamMulai, jamSelesai,
     dalamJamAktif: jam >= jamMulai && jam < jamSelesai,
-    jamSekarang: jam
+    jamSekarang: jam,
+    platformQuota: getPlatformQuotaStatus()
   };
 }
 
@@ -1458,36 +1465,73 @@ function buatPostinganOtomatis() {
         let channelLogs = [];
         if (postBloggerEnabled) channelLogs.push('Blogger');
         
-        // 2. Post ke Facebook Page (ISOLATED - Safe Try-Catch)
-        if (String(config.POST_TO_FACEBOOK) === 'true' && config.FB_PAGE_ID && config.FB_PAGE_ACCESS_TOKEN) {
+        const quotaStatus = getPlatformQuotaStatus();
+        const nowTs = new Date();
+        const props = PropertiesService.getScriptProperties();
+        
+        // 2. Post ke Facebook Page (ISOLATED - Safe Try-Catch & Anti-Spam Quota Max 10/day)
+        if (String(config.POST_TO_FACEBOOK) === 'true' && config.FB_PAGE_ID && config.FB_PAGE_ACCESS_TOKEN && quotaStatus.canPostFb) {
           try {
             const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
             const fbCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info & Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Baca selengkapnya: ${resBlogger.url}` : '');
             const resFb = postKeFacebook(fbCaption, heroThumb || heroLink, resBlogger.url || '');
             if (resFb && resFb.success) {
-              channelLogs.push('FB');
-              console.log('✅ Berhasil post ke Facebook Page');
+              channelLogs.push('FB Page');
+              props.setProperty('COUNT_FB_PAGE', String(quotaStatus.countFb + 1));
+              props.setProperty('LAST_FB_POST_TIME', nowTs.toISOString());
+              console.log(`✅ Berhasil post ke Facebook Page (${quotaStatus.countFb + 1}/${quotaStatus.targetFb})`);
             } else {
-              console.warn('⚠️ Gagal post ke Facebook: ' + (resFb.error || ''));
+              console.warn('⚠️ Gagal post ke Facebook Page: ' + (resFb.error || ''));
             }
           } catch(eFb) {
             console.warn('⚠️ FB Exception: ' + eFb);
           }
         }
         
-        // 3. Post ke Instagram (ISOLATED - Safe Try-Catch)
-        if (String(config.POST_TO_INSTAGRAM) === 'true' && config.IG_ACCOUNT_ID && config.FB_PAGE_ACCESS_TOKEN && (heroThumb || heroLink)) {
+        // 3. Post ke Instagram (ISOLATED - Safe Try-Catch & Anti-Spam Quota Max 10/day)
+        if (String(config.POST_TO_INSTAGRAM) === 'true' && config.IG_ACCOUNT_ID && config.FB_PAGE_ACCESS_TOKEN && (heroThumb || heroLink) && quotaStatus.canPostIg) {
           try {
             const igCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Order via WhatsApp: ${config.WHATSAPP_NUMBER}`;
             const resIg = postKeInstagram(igCaption, heroThumb || heroLink);
             if (resIg && resIg.success) {
               channelLogs.push('IG');
-              console.log('✅ Berhasil post ke Instagram');
+              props.setProperty('COUNT_IG', String(quotaStatus.countIg + 1));
+              props.setProperty('LAST_IG_POST_TIME', nowTs.toISOString());
+              console.log(`✅ Berhasil post ke Instagram (${quotaStatus.countIg + 1}/${quotaStatus.targetIg})`);
             } else {
               console.warn('⚠️ Gagal post ke Instagram: ' + (resIg.error || ''));
             }
           } catch(eIg) {
             console.warn('⚠️ IG Exception: ' + eIg);
+          }
+        }
+
+        // 4. Post ke Facebook Group (ISOLATED - Safe Multi-Day Cooldown & Round-Robin Rotation)
+        if (String(config.POST_TO_FB_GROUP) === 'true' && config.FB_GROUP_ID && config.FB_PAGE_ACCESS_TOKEN && quotaStatus.canPostFbGroup) {
+          try {
+            const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
+            const groupCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info / Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Link Katalog: ${resBlogger.url}` : '');
+            const resGroup = postKeFacebookGroup(groupCaption, heroThumb || heroLink, resBlogger.url || '');
+            if (resGroup && resGroup.success) {
+              const grpTag = resGroup.groupId ? `FB Group (${resGroup.groupId})` : 'FB Group';
+              channelLogs.push(grpTag);
+              props.setProperty('COUNT_FB_GROUP', '1');
+              
+              const todayStr = Utilities.formatDate(nowTs, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+              props.setProperty('LAST_FB_GROUP_POST_DATE', todayStr);
+              
+              // Jadwalkan posting FB Group berikutnya (hari ini + interval hari)
+              const nextDate = new Date(nowTs.getTime());
+              nextDate.setDate(nextDate.getDate() + (quotaStatus.groupIntervalDays || 3));
+              const nextDateStr = Utilities.formatDate(nextDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+              props.setProperty('NEXT_FB_GROUP_SCHEDULE_DATE', nextDateStr);
+              
+              console.log(`✅ Berhasil post ke Facebook Group [${resGroup.groupId}]. Jadwal posting grup berikutnya: ${nextDateStr}`);
+            } else {
+              console.warn('⚠️ Gagal post ke Facebook Group: ' + (resGroup.error || ''));
+            }
+          } catch(eGrp) {
+            console.warn('⚠️ FB Group Exception: ' + eGrp);
           }
         }
         
@@ -2293,4 +2337,161 @@ function testInstagramPost() {
   const testImg = 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800';
   const testCaption = `🚀 [TEST AUTOPOST] Halo Instagram!\n\nSistem integrasi Instagram Bisnis berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n#nafindo #testautopost`;
   return postKeInstagram(testCaption, testImg);
+}
+
+function postKeFacebookGroup(caption, imageUrl, linkUrl) {
+  const config = getConfig();
+  const groupIds = String(config.FB_GROUP_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
+  const token = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
+  
+  if (groupIds.length === 0 || !token) {
+    return { success: false, error: 'Facebook Group ID atau Access Token belum diisi di Pengaturan' };
+  }
+  
+  const props = PropertiesService.getScriptProperties();
+  let currentIndex = Number(props.getProperty('LAST_FB_GROUP_INDEX') || '0');
+  if (isNaN(currentIndex) || currentIndex >= groupIds.length || currentIndex < 0) currentIndex = 0;
+  
+  // Pilih 1 grup giliran saat ini (Round-Robin) untuk mencegah spamming serentak
+  const targetGroupId = groupIds[currentIndex];
+  
+  try {
+    let url = '';
+    let payload = {};
+    
+    if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+      url = `https://graph.facebook.com/v19.0/${targetGroupId}/photos`;
+      payload = {
+        url: imageUrl,
+        caption: caption || '',
+        access_token: token
+      };
+    } else {
+      url = `https://graph.facebook.com/v19.0/${targetGroupId}/feed`;
+      payload = {
+        message: caption || '',
+        access_token: token
+      };
+      if (linkUrl) payload.link = linkUrl;
+    }
+    
+    const res = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    
+    const code = res.getResponseCode();
+    const text = res.getContentText();
+    const json = JSON.parse(text);
+    
+    if (code >= 300 || json.error) {
+      const errMsg = json.error ? (json.error.message || JSON.stringify(json.error)) : ('FB Group Error (' + code + '): ' + text);
+      console.error(`FB Group (${targetGroupId}) Error: ` + errMsg);
+      return { success: false, groupId: targetGroupId, error: errMsg };
+    } else {
+      const postId = json.post_id || json.id;
+      // Perbarui giliran grup untuk jadwal berikutnya
+      const nextIndex = (currentIndex + 1) % groupIds.length;
+      props.setProperty('LAST_FB_GROUP_INDEX', String(nextIndex));
+      return { success: true, groupId: targetGroupId, id: postId, nextIndex };
+    }
+  } catch(e) {
+    return { success: false, groupId: targetGroupId, error: e.toString() };
+  }
+}
+
+function testFacebookGroupPost() {
+  const config = getConfig();
+  const testMsg = `🚀 [TEST AUTOPOST] Halo Anggota Grup!\n\nSistem autoposting Facebook Group dari Nafindo berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
+  return postKeFacebookGroup(testMsg, '', '');
+}
+
+function getPlatformQuotaStatus() {
+  const config = getConfig();
+  const props = PropertiesService.getScriptProperties();
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const storedDate = props.getProperty('PLATFORM_QUOTA_DATE');
+  
+  const jamMulai = Number(config.JAM_AKTIF_MULAI) || 8;
+  const jamSelesai = Number(config.JAM_AKTIF_SELESAI) || 22;
+  
+  if (storedDate !== todayStr) {
+    // Reset kuota harian untuk hari baru
+    props.setProperty('PLATFORM_QUOTA_DATE', todayStr);
+    props.setProperty('COUNT_FB_PAGE', '0');
+    props.setProperty('COUNT_IG', '0');
+    props.setProperty('COUNT_FB_GROUP', '0');
+    
+    // Tentukan target acak harian FB Page (misal: 3 - 5 post/hari)
+    const maxFb = Math.min(10, Math.max(1, Number(config.MAX_FB_POST_PER_DAY) || 5));
+    const minFb = Math.max(1, Math.min(3, Math.floor(maxFb * 0.6)));
+    const targetFb = Math.floor(Math.random() * (maxFb - minFb + 1)) + minFb;
+    props.setProperty('TARGET_FB_PAGE', String(targetFb));
+    
+    // Tentukan target acak harian IG (misal: 3 - 5 post/hari)
+    const maxIg = Math.min(10, Math.max(1, Number(config.MAX_IG_POST_PER_DAY) || 5));
+    const minIg = Math.max(1, Math.min(3, Math.floor(maxIg * 0.6)));
+    const targetIg = Math.floor(Math.random() * (maxIg - minIg + 1)) + minIg;
+    props.setProperty('TARGET_IG', String(targetIg));
+    
+    // Tentukan jam & menit acak untuk posting FB Group
+    const randomGroupHour = Math.floor(Math.random() * (jamSelesai - jamMulai)) + jamMulai;
+    const randomGroupMinute = Math.floor(Math.random() * 50) + 5;
+    props.setProperty('FB_GROUP_TARGET_HOUR', String(randomGroupHour));
+    props.setProperty('FB_GROUP_TARGET_MINUTE', String(randomGroupMinute));
+    console.log(`🎯 Multi-Platform Target Hari Ini (${todayStr}): FB Page: ${targetFb} post, IG: ${targetIg} post, FB Group: Jam ${randomGroupHour}:${randomGroupMinute}`);
+  }
+  
+  const countFb = Number(props.getProperty('COUNT_FB_PAGE') || '0');
+  const countIg = Number(props.getProperty('COUNT_IG') || '0');
+  const countGroup = Number(props.getProperty('COUNT_FB_GROUP') || '0');
+  
+  const targetFb = Number(props.getProperty('TARGET_FB_PAGE') || config.MAX_FB_POST_PER_DAY || '5');
+  const targetIg = Number(props.getProperty('TARGET_IG') || config.MAX_IG_POST_PER_DAY || '5');
+  const groupTargetHour = Number(props.getProperty('FB_GROUP_TARGET_HOUR') || '11');
+  const groupTargetMinute = Number(props.getProperty('FB_GROUP_TARGET_MINUTE') || '30');
+  
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  
+  // Anti-Spam Interval Check for FB Page & IG (Distribusi merata sepanjang jam aktif)
+  const activeHours = Math.max(1, jamSelesai - jamMulai);
+  const fbIntervalMins = Math.max(60, Math.floor((activeHours * 60) / (targetFb + 1))) + Math.floor(Math.random() * 20);
+  const igIntervalMins = Math.max(60, Math.floor((activeHours * 60) / (targetIg + 1))) + Math.floor(Math.random() * 20);
+  
+  const lastFbTime = props.getProperty('LAST_FB_POST_TIME');
+  const canPostFb = countFb < targetFb && (!lastFbTime || (now.getTime() - new Date(lastFbTime).getTime() >= fbIntervalMins * 60 * 1000));
+  
+  const lastIgTime = props.getProperty('LAST_IG_POST_TIME');
+  const canPostIg = countIg < targetIg && (!lastIgTime || (now.getTime() - new Date(lastIgTime).getTime() >= igIntervalMins * 60 * 1000));
+  
+  // FB Group: Multi-Day Cooldown & Random Hour Check (Anti-Ban & Anti-Kick)
+  const groupIntervalDays = Math.max(1, Number(config.FB_GROUP_INTERVAL_DAYS) || 3);
+  let nextGroupSchedule = props.getProperty('NEXT_FB_GROUP_SCHEDULE_DATE');
+  if (!nextGroupSchedule) {
+    nextGroupSchedule = todayStr;
+    props.setProperty('NEXT_FB_GROUP_SCHEDULE_DATE', nextGroupSchedule);
+  }
+  
+  const isGroupScheduledDay = todayStr >= nextGroupSchedule;
+  const isGroupTimeReached = (currentHour > groupTargetHour) || (currentHour === groupTargetHour && currentMinute >= groupTargetMinute);
+  const canPostFbGroup = isGroupScheduledDay && countGroup < 1 && isGroupTimeReached;
+  
+  return {
+    canPostFb,
+    canPostIg,
+    canPostFbGroup,
+    countFb, targetFb,
+    countIg, targetIg,
+    countGroup,
+    nextGroupSchedule,
+    groupTargetHour,
+    groupTargetMinute,
+    groupIntervalDays,
+    isGroupScheduledDay,
+    groupTargetTimeStr: `${String(groupTargetHour).padStart(2, '0')}:${String(groupTargetMinute).padStart(2, '0')}`
+  };
 }

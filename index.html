@@ -150,6 +150,49 @@
           <div class="stat-card"><div class="icon icon-purple"><i class="fas fa-layer-group"></i></div><div class="value" id="stProdukAktif">0</div><div class="label">Produk Aktif</div></div>
         </div>
 
+        <!-- Status Kuota Multi-Channel & Anti-Spam -->
+        <div class="card" style="margin-bottom:20px;border-left:4px solid var(--primary);">
+          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;">
+            <h4 style="margin:0;font-size:14px;display:flex;align-items:center;gap:8px;">
+              <i class="fas fa-network-wired" style="color:var(--primary)"></i> Status Kuota Kanal & Anti-Spam Hari Ini
+            </h4>
+            <span id="platformQuotaDateBadge" class="badge" style="background:#f1f3f4;color:var(--text);font-size:11px;">Hari Ini</span>
+          </div>
+          <div class="card-body" style="padding:14px 20px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;">
+              <!-- FB Page Status -->
+              <div style="background:#f8f9fa;padding:10px 14px;border-radius:8px;border:1px solid #e0e0e0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                  <span style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;"><i class="fab fa-facebook" style="color:#1877f2"></i> FB Page</span>
+                  <span id="stFbBadge" class="badge badge-success" style="font-size:10px;">Aktif</span>
+                </div>
+                <div style="font-size:18px;font-weight:700;" id="stFbCount">0 <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ 0 post</span></div>
+                <div style="font-size:11px;color:var(--text-sec);margin-top:2px;" id="stFbInterval">Jeda aman 1–2 jam</div>
+              </div>
+
+              <!-- IG Status -->
+              <div style="background:#f8f9fa;padding:10px 14px;border-radius:8px;border:1px solid #e0e0e0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                  <span style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;"><i class="fab fa-instagram" style="color:#e4405f"></i> Instagram</span>
+                  <span id="stIgBadge" class="badge badge-success" style="font-size:10px;">Aktif</span>
+                </div>
+                <div style="font-size:18px;font-weight:700;" id="stIgCount">0 <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ 0 post</span></div>
+                <div style="font-size:11px;color:var(--text-sec);margin-top:2px;" id="stIgInterval">Jeda aman 1–2 jam</div>
+              </div>
+
+              <!-- FB Group Status -->
+              <div style="background:#f8f9fa;padding:10px 14px;border-radius:8px;border:1px solid #e0e0e0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                  <span style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;"><i class="fas fa-users" style="color:#0d8af0"></i> FB Group</span>
+                  <span id="stGroupBadge" class="badge badge-info" style="font-size:10px;">Jadwal Acak</span>
+                </div>
+                <div style="font-size:14px;font-weight:700;margin-top:3px;" id="stGroupSchedule">Memuat...</div>
+                <div style="font-size:11px;color:var(--text-sec);margin-top:2px;" id="stGroupTarget">Jam Target: -</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Monitoring Harian -->
         <div class="card">
           <div class="card-header"><h3><i class="fas fa-calendar-day"></i> Monitoring Harian</h3></div>
@@ -467,13 +510,16 @@
         <!-- PENGATURAN MULTI-CHANNEL (BLOGGER, FACEBOOK, INSTAGRAM) -->
         <div class="card">
           <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
-            <h3>📱 Pengaturan Multi-Channel (Facebook & Instagram)</h3>
-            <span class="badge" style="background:#e8f0fe;color:var(--primary);font-size:11px;">Cross-Posting Otomatis</span>
+            <h3>📱 Pengaturan Multi-Channel & Anti-Spam (Facebook & Instagram)</h3>
+            <span class="badge" style="background:#e8f0fe;color:var(--primary);font-size:11px;">Cross-Posting Terisolasi & Anti-Ban</span>
           </div>
           <div class="card-body">
-            <p style="font-size:12px;color:var(--text-sec);margin-bottom:16px;">
-              Pilih platform tujuan promosi. Sistem memproses setiap platform secara terisolasi dan mandiri, sehingga aman dan tidak saling mengganggu.
-            </p>
+            <!-- Anti-Spam Notice Alert -->
+            <div style="background:#e8f4fd;border:1px solid #b6e0fe;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#035388;line-height:1.5;">
+              <strong style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:13px;"><i class="fas fa-shield-alt"></i> Protokol Anti-Spam & Keamanan Akun Multi-Platform</strong>
+              Blogger memposting secara reguler. Agar Facebook & Instagram tidak memblokir akun Anda, postingan <strong>FB Page & Instagram dibatasi (3–8 post/hari)</strong> dengan jeda sebar alami (1–2 jam). 
+              Khusus <strong>Facebook Group</strong>, sistem hanya memposting <strong>1x setiap 2–4 hari pada jam acak</strong> dengan sistem giliran grup (Round-Robin) untuk menghindari deteksi spam atau dikeluarkan oleh admin grup.
+            </div>
 
             <!-- Checkbox Saklar Platform -->
             <div style="display:flex;gap:20px;flex-wrap:wrap;background:#f8f9fa;padding:14px;border-radius:8px;margin-bottom:16px;border:1px solid #e0e0e0;">
@@ -489,6 +535,10 @@
                 <input type="checkbox" id="cfgPostIg" style="width:18px;height:18px;cursor:pointer;">
                 <i class="fab fa-instagram" style="color:#e4405f;font-size:18px;"></i> Instagram Bisnis
               </label>
+              <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;user-select:none;">
+                <input type="checkbox" id="cfgPostFbGroup" style="width:18px;height:18px;cursor:pointer;">
+                <i class="fas fa-users" style="color:#0d8af0;font-size:18px;"></i> Facebook Group
+              </label>
             </div>
 
             <!-- Meta Configuration Form -->
@@ -496,25 +546,62 @@
               <div class="form-group">
                 <label><i class="fab fa-facebook" style="color:#1877f2;"></i> Facebook Page ID</label>
                 <input type="text" class="form-control" id="cfgFbPageId" placeholder="Contoh: 104829104928172">
-                <small style="color:#888">Dapatkan dari menu 'About / Tentang' Halaman Facebook Anda</small>
+                <small style="color:#888">ID Halaman Facebook (dapat dilihat pada menu 'About / Tentang' Page)</small>
               </div>
               <div class="form-group">
                 <label><i class="fab fa-instagram" style="color:#e4405f;"></i> Instagram Business Account ID</label>
                 <input type="text" class="form-control" id="cfgIgAccountId" placeholder="Contoh: 17841405309218492">
-                <small style="color:#888">ID Akun IG Bisnis yang terhubung ke Halaman Facebook</small>
+                <small style="color:#888">ID Akun IG Bisnis yang terhubung dengan Halaman Facebook</small>
               </div>
+            </div>
+
+            <div class="form-group">
+              <label><i class="fas fa-users" style="color:#0d8af0;"></i> Facebook Group ID(s) <small style="font-weight:normal;color:#888">(Pisah dengan koma atau baris baru jika lebih dari 1)</small></label>
+              <input type="text" class="form-control" id="cfgFbGroupId" placeholder="Contoh: 123456789012345, 987654321098765">
+              <small style="color:#888">Sistem otomatis merotasi postingan ke 1 grup per jadwal (Round-Robin) agar aman</small>
             </div>
 
             <div class="form-group">
               <label><i class="fas fa-key" style="color:var(--primary);"></i> Meta Page Access Token (Long-Lived Token)</label>
               <input type="password" class="form-control" id="cfgFbToken" placeholder="EAA...">
-              <small style="color:#888">Token akses Halaman dari Meta for Developers (Graph API Explorer)</small>
+              <small style="color:#888">Token akses Page dari Meta Graph API Explorer (permission: pages_manage_posts, pages_read_engagement, instagram_basic, instagram_content_publish)</small>
+            </div>
+
+            <!-- Anti-Spam & Quota Tuning -->
+            <div style="margin-top:14px;padding-top:14px;border-top:1px dashed #e0e0e0;">
+              <h4 style="font-size:13px;margin-bottom:12px;color:var(--text);display:flex;align-items:center;gap:6px;">
+                <i class="fas fa-sliders-h" style="color:var(--primary);"></i> Batas Kuota & Frekuensi Posting Sosial Media
+              </h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label><i class="fab fa-facebook" style="color:#1877f2;"></i> Batas Harian FB Page (Post/Hari)</label>
+                  <input type="number" class="form-control" id="cfgMaxFbPost" min="1" max="10" value="5">
+                  <small style="color:#888">Saran aman: 3 - 8 post/hari (jeda 1-2 jam)</small>
+                </div>
+                <div class="form-group">
+                  <label><i class="fab fa-instagram" style="color:#e4405f;"></i> Batas Harian Instagram (Post/Hari)</label>
+                  <input type="number" class="form-control" id="cfgMaxIgPost" min="1" max="10" value="5">
+                  <small style="color:#888">Saran aman: 3 - 8 post/hari (jeda 1-2 jam)</small>
+                </div>
+                <div class="form-group">
+                  <label><i class="fas fa-users" style="color:#0d8af0;"></i> Frekuensi Post Facebook Group</label>
+                  <select class="form-control" id="cfgFbGroupInterval">
+                    <option value="2">1x Setiap 2 Hari Sekali</option>
+                    <option value="3" selected>1x Setiap 3 Hari Sekali (Paling Aman)</option>
+                    <option value="4">1x Setiap 4 Hari Sekali</option>
+                    <option value="5">1x Setiap 5 Hari Sekali</option>
+                    <option value="7">1x Seminggu Sekali</option>
+                  </select>
+                  <small style="color:#888">Diposting jam acak, 1 post per hari jadwal</small>
+                </div>
+              </div>
             </div>
 
             <!-- Testing Buttons -->
-            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
-              <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostFacebook()"><i class="fab fa-facebook"></i> Test Post Facebook</button>
+            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostFacebook()"><i class="fab fa-facebook"></i> Test Post FB Page</button>
               <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostInstagram()"><i class="fab fa-instagram"></i> Test Post Instagram</button>
+              <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostFacebookGroup()"><i class="fas fa-users"></i> Test Post FB Group</button>
             </div>
           </div>
         </div>
@@ -904,6 +991,30 @@
           
           document.getElementById('stQueue').textContent = stats.queued;
           document.getElementById('stProdukAktif').textContent = stats.totalProduk;
+          
+          if (stats.platformQuota) {
+            const pq = stats.platformQuota;
+            if (document.getElementById('stFbCount')) {
+              document.getElementById('stFbCount').innerHTML = `${pq.countFb || 0} <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ ${pq.targetFb || 5} post</span>`;
+            }
+            if (document.getElementById('stIgCount')) {
+              document.getElementById('stIgCount').innerHTML = `${pq.countIg || 0} <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ ${pq.targetIg || 5} post</span>`;
+            }
+            if (document.getElementById('stGroupSchedule')) {
+              const todayStr = new Date().toISOString().split('T')[0];
+              let schedText = pq.nextGroupSchedule || todayStr;
+              if (schedText === todayStr) {
+                schedText = (pq.countGroup >= 1) ? '✅ Selesai Hari Ini' : '⏳ Terjadwal Hari Ini';
+              } else {
+                schedText = `📅 ${schedText}`;
+              }
+              document.getElementById('stGroupSchedule').textContent = schedText;
+            }
+            if (document.getElementById('stGroupTarget') && pq.groupTargetTimeStr) {
+              document.getElementById('stGroupTarget').textContent = `Target Jam: ~${pq.groupTargetTimeStr} WIB`;
+            }
+          }
+          
           updateTriggerUI(stats);
         } else {
           showToast('API Error: ' + (stats.error || 'Unknown error'), 'error');
@@ -2078,13 +2189,18 @@
         document.getElementById('cfgDriveFolder').value = cfg.DRIVE_FOLDER_ID || '';
         document.getElementById('cfgRefreshHour').value = cfg.KEYWORD_REFRESH_HOUR || 0;
         
-        // Multi-Channel FB & IG
+        // Multi-Channel FB, IG & FB Group
         if (document.getElementById('cfgPostBlogger')) document.getElementById('cfgPostBlogger').checked = cfg.POST_TO_BLOGGER !== 'false';
         if (document.getElementById('cfgPostFb')) document.getElementById('cfgPostFb').checked = String(cfg.POST_TO_FACEBOOK) === 'true';
         if (document.getElementById('cfgPostIg')) document.getElementById('cfgPostIg').checked = String(cfg.POST_TO_INSTAGRAM) === 'true';
+        if (document.getElementById('cfgPostFbGroup')) document.getElementById('cfgPostFbGroup').checked = String(cfg.POST_TO_FB_GROUP) === 'true';
         if (document.getElementById('cfgFbPageId')) document.getElementById('cfgFbPageId').value = cfg.FB_PAGE_ID || '';
         if (document.getElementById('cfgFbToken')) document.getElementById('cfgFbToken').value = cfg.FB_PAGE_ACCESS_TOKEN || '';
         if (document.getElementById('cfgIgAccountId')) document.getElementById('cfgIgAccountId').value = cfg.IG_ACCOUNT_ID || '';
+        if (document.getElementById('cfgFbGroupId')) document.getElementById('cfgFbGroupId').value = cfg.FB_GROUP_ID || '';
+        if (document.getElementById('cfgMaxFbPost')) document.getElementById('cfgMaxFbPost').value = cfg.MAX_FB_POST_PER_DAY || 5;
+        if (document.getElementById('cfgMaxIgPost')) document.getElementById('cfgMaxIgPost').value = cfg.MAX_IG_POST_PER_DAY || 5;
+        if (document.getElementById('cfgFbGroupInterval')) document.getElementById('cfgFbGroupInterval').value = cfg.FB_GROUP_INTERVAL_DAYS || 3;
         
         toggleDriveFolder();
         
@@ -2146,9 +2262,14 @@
         POST_TO_BLOGGER: document.getElementById('cfgPostBlogger') ? (document.getElementById('cfgPostBlogger').checked ? 'true' : 'false') : 'true',
         POST_TO_FACEBOOK: document.getElementById('cfgPostFb') ? (document.getElementById('cfgPostFb').checked ? 'true' : 'false') : 'false',
         POST_TO_INSTAGRAM: document.getElementById('cfgPostIg') ? (document.getElementById('cfgPostIg').checked ? 'true' : 'false') : 'false',
+        POST_TO_FB_GROUP: document.getElementById('cfgPostFbGroup') ? (document.getElementById('cfgPostFbGroup').checked ? 'true' : 'false') : 'false',
         FB_PAGE_ID: document.getElementById('cfgFbPageId')?.value.trim() || '',
         FB_PAGE_ACCESS_TOKEN: document.getElementById('cfgFbToken')?.value.trim() || '',
-        IG_ACCOUNT_ID: document.getElementById('cfgIgAccountId')?.value.trim() || ''
+        IG_ACCOUNT_ID: document.getElementById('cfgIgAccountId')?.value.trim() || '',
+        FB_GROUP_ID: document.getElementById('cfgFbGroupId')?.value.trim() || '',
+        MAX_FB_POST_PER_DAY: parseInt(document.getElementById('cfgMaxFbPost')?.value) || 5,
+        MAX_IG_POST_PER_DAY: parseInt(document.getElementById('cfgMaxIgPost')?.value) || 5,
+        FB_GROUP_INTERVAL_DAYS: parseInt(document.getElementById('cfgFbGroupInterval')?.value) || 3
       };
       
       try {
@@ -2181,6 +2302,18 @@
           if (res.url) window.open(res.url, '_blank');
         } else {
           showToast('❌ Gagal: ' + (res.error || 'Periksa IG Account ID & Token'), 'error');
+        }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    async function testPostFacebookGroup() {
+      showToast('Mengirim test postingan ke Facebook Group...', 'success');
+      try {
+        const res = await apiPost('testFacebookGroup', {});
+        if (res.success) {
+          showToast('✅ Berhasil posting ke Facebook Group (' + (res.groupId || '') + ')!', 'success');
+        } else {
+          showToast('❌ Gagal: ' + (res.error || 'Periksa FB Group ID & Token'), 'error');
         }
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
