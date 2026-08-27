@@ -1,7 +1,8 @@
 /**
  * ============================================================
- * NAFINDO BLOGGER AUTOMATION API v3.5
- * Auto Keyword Generation | Nightly Refresh | Smart Queue
+ * NAFINDO BLOGGER & MULTI-CHANNEL AUTOMATION API v4.0
+ * Auto Keyword Generation | Multi-Platform (Blogger, FB Page, IG, FB Group) | Anti-Spam Quota
+ * Updated: 27 Agustus 2026 (Fitur Facebook Group, FB Page, Instagram)
  * ============================================================
  */
 
