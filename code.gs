@@ -22,7 +22,13 @@ const DEFAULT_CONFIG = {
   FOTO_MODE: 'drive',
   DRIVE_FOLDER_ID: '',
   SPREADSHEET_ID: '',
-  KEYWORD_REFRESH_HOUR: 0  // Jam 00:00 refresh keyword
+  KEYWORD_REFRESH_HOUR: 0,
+  POST_TO_BLOGGER: 'true',
+  POST_TO_FACEBOOK: 'false',
+  POST_TO_INSTAGRAM: 'false',
+  FB_PAGE_ID: '',
+  FB_PAGE_ACCESS_TOKEN: '',
+  IG_ACCOUNT_ID: ''
 };
 
 // ==================== WEB APP ====================
@@ -90,6 +96,8 @@ function doPost(e) {
       case 'refreshAllKeywords': result = refreshAllKeywords(); break;
       case 'cleanOldLogs': result = { success: true, count: cleanOldLogs() }; break;
       case 'sortLogs': result = { success: true, result: sortLogsNewestFirst() }; break;
+      case 'testFacebook': result = testFacebookPost(); break;
+      case 'testInstagram': result = testInstagramPost(); break;
       case 'uploadImage': result = uploadImage(data.name, data.type, data.base64, data.folderId); break;
       default: result = { success: false, error: 'Aksi tidak dikenali: ' + action }; break;
     }
@@ -1432,7 +1440,12 @@ function buatPostinganOtomatis() {
         tabelAi: aiData.table, gallery: pData.gallery || pData.saranWarna, varian: pData.varian || pData.galleryVarian
       });
       
-      const resBlogger = postKeBlogger(finalTitle, finalHtml, labels);
+      // 1. Post ke Blogger (jika diaktifkan)
+      let resBlogger = { success: true };
+      const postBloggerEnabled = config.POST_TO_BLOGGER !== 'false';
+      if (postBloggerEnabled) {
+        resBlogger = postKeBlogger(finalTitle, finalHtml, labels);
+      }
       
       if (resBlogger && resBlogger.success) {
         isSuccess = true;
@@ -1442,9 +1455,46 @@ function buatPostinganOtomatis() {
         sheet.getRange(item.row, 8).setValue(new Date());
         if (resBlogger.url) sheet.getRange(item.row, 11).setValue(resBlogger.url);
         
+        let channelLogs = [];
+        if (postBloggerEnabled) channelLogs.push('Blogger');
+        
+        // 2. Post ke Facebook Page (ISOLATED - Safe Try-Catch)
+        if (String(config.POST_TO_FACEBOOK) === 'true' && config.FB_PAGE_ID && config.FB_PAGE_ACCESS_TOKEN) {
+          try {
+            const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
+            const fbCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info & Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Baca selengkapnya: ${resBlogger.url}` : '');
+            const resFb = postKeFacebook(fbCaption, heroThumb || heroLink, resBlogger.url || '');
+            if (resFb && resFb.success) {
+              channelLogs.push('FB');
+              console.log('✅ Berhasil post ke Facebook Page');
+            } else {
+              console.warn('⚠️ Gagal post ke Facebook: ' + (resFb.error || ''));
+            }
+          } catch(eFb) {
+            console.warn('⚠️ FB Exception: ' + eFb);
+          }
+        }
+        
+        // 3. Post ke Instagram (ISOLATED - Safe Try-Catch)
+        if (String(config.POST_TO_INSTAGRAM) === 'true' && config.IG_ACCOUNT_ID && config.FB_PAGE_ACCESS_TOKEN && (heroThumb || heroLink)) {
+          try {
+            const igCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Order via WhatsApp: ${config.WHATSAPP_NUMBER}`;
+            const resIg = postKeInstagram(igCaption, heroThumb || heroLink);
+            if (resIg && resIg.success) {
+              channelLogs.push('IG');
+              console.log('✅ Berhasil post ke Instagram');
+            } else {
+              console.warn('⚠️ Gagal post ke Instagram: ' + (resIg.error || ''));
+            }
+          } catch(eIg) {
+            console.warn('⚠️ IG Exception: ' + eIg);
+          }
+        }
+        
+        const channelStr = channelLogs.length > 0 ? ` [${channelLogs.join(', ')}]` : '';
         const retryTag = attempt > 1 ? ` (Sukses setelah ${attempt}x coba)` : '';
-        addLog(item.produkNama, item.keyword, 'Sukses' + retryTag, resBlogger.url || '', '');
-        console.log(`✅ BERHASIL POST (${attempt}x percobaan): ${finalTitle}`);
+        addLog(item.produkNama, item.keyword, 'Sukses' + channelStr + retryTag, resBlogger.url || '', '');
+        console.log(`✅ BERHASIL POST (${attempt}x percobaan): ${finalTitle}${channelStr}`);
         break;
       } else {
         lastError = resBlogger ? (resBlogger.error || 'Blogger error') : 'Blogger error';
@@ -1527,7 +1577,12 @@ function postManual(produkNama, keyword, row) {
       tabelAi: aiData.table, gallery: pData.gallery || pData.saranWarna, varian: pData.varian || pData.galleryVarian
     });
     
-    const resBlogger = postKeBlogger(finalTitle, finalHtml, labels);
+    // 1. Post ke Blogger (jika diaktifkan)
+    let resBlogger = { success: true };
+    const postBloggerEnabled = config.POST_TO_BLOGGER !== 'false';
+    if (postBloggerEnabled) {
+      resBlogger = postKeBlogger(finalTitle, finalHtml, labels);
+    }
     
     if (resBlogger && resBlogger.success) {
       isSuccess = true;
@@ -1535,9 +1590,33 @@ function postManual(produkNama, keyword, row) {
       sheet.getRange(row, 7).setValue('Selesai');
       sheet.getRange(row, 8).setValue(new Date());
       if (resBlogger.url) sheet.getRange(row, 11).setValue(resBlogger.url);
+      
+      let channelLogs = [];
+      if (postBloggerEnabled) channelLogs.push('Blogger');
+      
+      // 2. Post ke Facebook (ISOLATED)
+      if (String(config.POST_TO_FACEBOOK) === 'true' && config.FB_PAGE_ID && config.FB_PAGE_ACCESS_TOKEN) {
+        try {
+          const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
+          const fbCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info & Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Link Blog: ${resBlogger.url}` : '');
+          const resFb = postKeFacebook(fbCaption, heroThumb || heroLink, resBlogger.url || '');
+          if (resFb && resFb.success) channelLogs.push('FB');
+        } catch(eFb) {}
+      }
+      
+      // 3. Post ke Instagram (ISOLATED)
+      if (String(config.POST_TO_INSTAGRAM) === 'true' && config.IG_ACCOUNT_ID && config.FB_PAGE_ACCESS_TOKEN && (heroThumb || heroLink)) {
+        try {
+          const igCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Order via WhatsApp: ${config.WHATSAPP_NUMBER}`;
+          const resIg = postKeInstagram(igCaption, heroThumb || heroLink);
+          if (resIg && resIg.success) channelLogs.push('IG');
+        } catch(eIg) {}
+      }
+      
+      const channelStr = channelLogs.length > 0 ? ` [${channelLogs.join(', ')}]` : '';
       const retryTag = attempt > 1 ? ` (Retry ke-${attempt})` : '';
-      addLog(produkNama, keyword, 'Sukses (Manual)' + retryTag, resBlogger.url || '', '');
-      return { success: true, title: finalTitle, url: resBlogger.url };
+      addLog(produkNama, keyword, 'Sukses (Manual)' + channelStr + retryTag, resBlogger.url || '', '');
+      return { success: true, title: finalTitle, url: resBlogger.url, channels: channelLogs };
     } else {
       lastError = resBlogger ? (resBlogger.error || 'Blogger error') : 'Gagal post ke Blogger';
       if (attempt < MAX_RETRIES) Utilities.sleep(2500);
@@ -1759,22 +1838,31 @@ function getAIDescription(nama, kw, tipe, spec) {
     ? config.GROQ_MODEL 
     : 'openai/gpt-oss-120b';
   
-  const prompt = `Buat konten penawaran produk profesional.
+  const prompt = `Buat konten penawaran produk profesional untuk Blog dan Media Sosial (Facebook & Instagram).
 
 PRODUK UTAMA: ${nama}
 KATA KUNCI/JUDUL: ${kw}
 VARIASI TIPE: ${tipe}
 DATA SPESIFIKASI ASLI:
 ${spec || 'Hubungi admin untuk detail spesifikasi.'}
+NOMOR WHATSAPP: ${config.WHATSAPP_NUMBER}
+NAMA PERUSAHAAN: ${config.COMPANY_NAME || ''}
 
 TUGAS:
-1. Artikel 3-4 paragraf HTML persuasif, SEO-friendly, bahasa Indonesia. Fokus 100% pada produk "${nama}" dan kata kunci "${kw}".
-2. Tabel HTML spesifikasi, header #4285f4 teks putih.
-3. JANGAN mengarang data spesifikasi di luar data asli, dan DILARANG menyebut produk/material jenis lain yang berbeda kategori.
-4. Judul SEO: kata kunci menarik | produk | kota Indonesia acak | ${config.WHATSAPP_NUMBER}
+1. ARTIKEL BLOG:
+   - Judul SEO: kata kunci menarik | produk | kota Indonesia acak | ${config.WHATSAPP_NUMBER}
+   - Deskripsi: 3-4 paragraf HTML persuasif, SEO-friendly, bahasa Indonesia. Fokus 100% pada produk "${nama}" dan kata kunci "${kw}".
+   - Tabel: HTML spesifikasi, header #4285f4 teks putih.
+   - JANGAN mengarang data spesifikasi di luar data asli, dan DILARANG menyebut produk/material jenis lain yang berbeda kategori.
+2. CAPTION SOSIAL MEDIA (Facebook & Instagram):
+   - Hook / Headline menarik dengan emoji yang pas
+   - 3-4 poin keunggulan & manfaat produk singkat & padat
+   - Call to Action (CTA) ke WhatsApp ${config.WHATSAPP_NUMBER}
+   - 10-15 Hashtags (#) yang relevan & populer
+   - Format Teks Bersih (Plain Text, TANPA tag HTML)
 
 OUTPUT JSON:
-{"title":"...","description":"...","table":"..."}`;
+{"title":"...","description":"...","table":"...","socialCaption":"..."}`;
 
   try {
     const res = UrlFetchApp.fetch(url, {
@@ -2063,4 +2151,146 @@ function testDriveAuth() {
     console.error("GAGAL OTORISASI DRIVE: " + e.toString());
     return { success: false, error: e.toString() };
   }
+}
+
+// ==================== META (FACEBOOK & INSTAGRAM) API ====================
+
+function postKeFacebook(caption, imageUrl, linkUrl) {
+  const config = getConfig();
+  const pageId = String(config.FB_PAGE_ID || '').trim();
+  const pageToken = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
+  
+  if (!pageId || !pageToken) {
+    return { success: false, error: 'Facebook Page ID atau Access Token belum diisi di Pengaturan' };
+  }
+  
+  try {
+    let url = '';
+    let payload = {};
+    
+    // Jika ada gambar produk publik
+    if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+      url = `https://graph.facebook.com/v19.0/${pageId}/photos`;
+      payload = {
+        url: imageUrl,
+        caption: caption || '',
+        access_token: pageToken
+      };
+    } else {
+      url = `https://graph.facebook.com/v19.0/${pageId}/feed`;
+      payload = {
+        message: caption || '',
+        access_token: pageToken
+      };
+      if (linkUrl) payload.link = linkUrl;
+    }
+    
+    const res = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    
+    const code = res.getResponseCode();
+    const text = res.getContentText();
+    const json = JSON.parse(text);
+    
+    if (code >= 300 || json.error) {
+      const errMsg = json.error ? (json.error.message || JSON.stringify(json.error)) : ('FB API Error (' + code + '): ' + text);
+      console.error('Facebook Post Error: ' + errMsg);
+      return { success: false, error: errMsg };
+    }
+    
+    const postId = json.post_id || json.id;
+    return { success: true, id: postId, url: `https://www.facebook.com/${postId}` };
+  } catch(e) {
+    console.error('Exception postKeFacebook: ' + e);
+    return { success: false, error: e.toString() };
+  }
+}
+
+function postKeInstagram(caption, imageUrl) {
+  const config = getConfig();
+  const igAccountId = String(config.IG_ACCOUNT_ID || '').trim();
+  const token = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
+  
+  if (!igAccountId || !token) {
+    return { success: false, error: 'Instagram Account ID atau Access Token belum diisi di Pengaturan' };
+  }
+  
+  if (!imageUrl || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
+    return { success: false, error: 'Instagram membutuhkan minimal 1 URL gambar publik yang valid (JPEG/PNG)' };
+  }
+  
+  try {
+    // Step 1: Buat Media Container
+    const containerUrl = `https://graph.facebook.com/v19.0/${igAccountId}/media`;
+    const containerRes = UrlFetchApp.fetch(containerUrl, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        image_url: imageUrl,
+        caption: caption || '',
+        access_token: token
+      }),
+      muteHttpExceptions: true
+    });
+    
+    const cCode = containerRes.getResponseCode();
+    const cText = containerRes.getContentText();
+    const cJson = JSON.parse(cText);
+    
+    if (cCode >= 300 || cJson.error || !cJson.id) {
+      const errMsg = cJson.error ? (cJson.error.message || JSON.stringify(cJson.error)) : ('IG Container Error (' + cCode + '): ' + cText);
+      console.error('Instagram Container Error: ' + errMsg);
+      return { success: false, error: errMsg };
+    }
+    
+    const creationId = cJson.id;
+    
+    // Jeda 3 detik agar media diproses di server Meta
+    Utilities.sleep(3000);
+    
+    // Step 2: Publish Container
+    const publishUrl = `https://graph.facebook.com/v19.0/${igAccountId}/media_publish`;
+    const publishRes = UrlFetchApp.fetch(publishUrl, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        creation_id: creationId,
+        access_token: token
+      }),
+      muteHttpExceptions: true
+    });
+    
+    const pCode = publishRes.getResponseCode();
+    const pText = publishRes.getContentText();
+    const pJson = JSON.parse(pText);
+    
+    if (pCode >= 300 || pJson.error || !pJson.id) {
+      const errMsg = pJson.error ? (pJson.error.message || JSON.stringify(pJson.error)) : ('IG Publish Error (' + pCode + '): ' + pText);
+      console.error('Instagram Publish Error: ' + errMsg);
+      return { success: false, error: errMsg };
+    }
+    
+    const igPostId = pJson.id;
+    return { success: true, id: igPostId, url: `https://www.instagram.com/p/${igPostId}/` };
+  } catch(e) {
+    console.error('Exception postKeInstagram: ' + e);
+    return { success: false, error: e.toString() };
+  }
+}
+
+function testFacebookPost() {
+  const config = getConfig();
+  const testMsg = `🚀 [TEST AUTOPOST] Halo dari Nafindo Autoposting!\n\nSistem integrasi Facebook Page berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
+  return postKeFacebook(testMsg, '', '');
+}
+
+function testInstagramPost() {
+  const config = getConfig();
+  const testImg = 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800';
+  const testCaption = `🚀 [TEST AUTOPOST] Halo Instagram!\n\nSistem integrasi Instagram Bisnis berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n#nafindo #testautopost`;
+  return postKeInstagram(testCaption, testImg);
 }

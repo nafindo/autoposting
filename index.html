@@ -463,6 +463,61 @@
             </div>
           </div>
         </div>
+
+        <!-- PENGATURAN MULTI-CHANNEL (BLOGGER, FACEBOOK, INSTAGRAM) -->
+        <div class="card">
+          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+            <h3>📱 Pengaturan Multi-Channel (Facebook & Instagram)</h3>
+            <span class="badge" style="background:#e8f0fe;color:var(--primary);font-size:11px;">Cross-Posting Otomatis</span>
+          </div>
+          <div class="card-body">
+            <p style="font-size:12px;color:var(--text-sec);margin-bottom:16px;">
+              Pilih platform tujuan promosi. Sistem memproses setiap platform secara terisolasi dan mandiri, sehingga aman dan tidak saling mengganggu.
+            </p>
+
+            <!-- Checkbox Saklar Platform -->
+            <div style="display:flex;gap:20px;flex-wrap:wrap;background:#f8f9fa;padding:14px;border-radius:8px;margin-bottom:16px;border:1px solid #e0e0e0;">
+              <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;user-select:none;">
+                <input type="checkbox" id="cfgPostBlogger" checked style="width:18px;height:18px;cursor:pointer;">
+                <i class="fab fa-blogger" style="color:#f57d00;font-size:18px;"></i> Blogger (Blogspot)
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;user-select:none;">
+                <input type="checkbox" id="cfgPostFb" style="width:18px;height:18px;cursor:pointer;">
+                <i class="fab fa-facebook" style="color:#1877f2;font-size:18px;"></i> Facebook Page
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;user-select:none;">
+                <input type="checkbox" id="cfgPostIg" style="width:18px;height:18px;cursor:pointer;">
+                <i class="fab fa-instagram" style="color:#e4405f;font-size:18px;"></i> Instagram Bisnis
+              </label>
+            </div>
+
+            <!-- Meta Configuration Form -->
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fab fa-facebook" style="color:#1877f2;"></i> Facebook Page ID</label>
+                <input type="text" class="form-control" id="cfgFbPageId" placeholder="Contoh: 104829104928172">
+                <small style="color:#888">Dapatkan dari menu 'About / Tentang' Halaman Facebook Anda</small>
+              </div>
+              <div class="form-group">
+                <label><i class="fab fa-instagram" style="color:#e4405f;"></i> Instagram Business Account ID</label>
+                <input type="text" class="form-control" id="cfgIgAccountId" placeholder="Contoh: 17841405309218492">
+                <small style="color:#888">ID Akun IG Bisnis yang terhubung ke Halaman Facebook</small>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label><i class="fas fa-key" style="color:var(--primary);"></i> Meta Page Access Token (Long-Lived Token)</label>
+              <input type="password" class="form-control" id="cfgFbToken" placeholder="EAA...">
+              <small style="color:#888">Token akses Halaman dari Meta for Developers (Graph API Explorer)</small>
+            </div>
+
+            <!-- Testing Buttons -->
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostFacebook()"><i class="fab fa-facebook"></i> Test Post Facebook</button>
+              <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostInstagram()"><i class="fab fa-instagram"></i> Test Post Instagram</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2023,6 +2078,14 @@
         document.getElementById('cfgDriveFolder').value = cfg.DRIVE_FOLDER_ID || '';
         document.getElementById('cfgRefreshHour').value = cfg.KEYWORD_REFRESH_HOUR || 0;
         
+        // Multi-Channel FB & IG
+        if (document.getElementById('cfgPostBlogger')) document.getElementById('cfgPostBlogger').checked = cfg.POST_TO_BLOGGER !== 'false';
+        if (document.getElementById('cfgPostFb')) document.getElementById('cfgPostFb').checked = String(cfg.POST_TO_FACEBOOK) === 'true';
+        if (document.getElementById('cfgPostIg')) document.getElementById('cfgPostIg').checked = String(cfg.POST_TO_INSTAGRAM) === 'true';
+        if (document.getElementById('cfgFbPageId')) document.getElementById('cfgFbPageId').value = cfg.FB_PAGE_ID || '';
+        if (document.getElementById('cfgFbToken')) document.getElementById('cfgFbToken').value = cfg.FB_PAGE_ACCESS_TOKEN || '';
+        if (document.getElementById('cfgIgAccountId')) document.getElementById('cfgIgAccountId').value = cfg.IG_ACCOUNT_ID || '';
+        
         toggleDriveFolder();
         
         const container = document.getElementById('aiKeysContainer');
@@ -2079,7 +2142,13 @@
         COMPANY_NAME: document.getElementById('cfgCompany').value.trim(),
         FOTO_MODE: document.getElementById('cfgFotoMode').value,
         DRIVE_FOLDER_ID: document.getElementById('cfgDriveFolder').value.trim(),
-        KEYWORD_REFRESH_HOUR: parseInt(document.getElementById('cfgRefreshHour').value) || 0
+        KEYWORD_REFRESH_HOUR: parseInt(document.getElementById('cfgRefreshHour').value) || 0,
+        POST_TO_BLOGGER: document.getElementById('cfgPostBlogger') ? (document.getElementById('cfgPostBlogger').checked ? 'true' : 'false') : 'true',
+        POST_TO_FACEBOOK: document.getElementById('cfgPostFb') ? (document.getElementById('cfgPostFb').checked ? 'true' : 'false') : 'false',
+        POST_TO_INSTAGRAM: document.getElementById('cfgPostIg') ? (document.getElementById('cfgPostIg').checked ? 'true' : 'false') : 'false',
+        FB_PAGE_ID: document.getElementById('cfgFbPageId')?.value.trim() || '',
+        FB_PAGE_ACCESS_TOKEN: document.getElementById('cfgFbToken')?.value.trim() || '',
+        IG_ACCOUNT_ID: document.getElementById('cfgIgAccountId')?.value.trim() || ''
       };
       
       try {
@@ -2088,6 +2157,32 @@
         showToast('Pengaturan disimpan!', 'success');
         loadDashboard();
       } catch(e) { showToast('Gagal simpan: ' + e.message, 'error'); }
+    }
+
+    async function testPostFacebook() {
+      showToast('Mengirim test postingan ke Facebook...', 'success');
+      try {
+        const res = await apiPost('testFacebook', {});
+        if (res.success) {
+          showToast('✅ Berhasil posting ke Facebook Page!', 'success');
+          if (res.url) window.open(res.url, '_blank');
+        } else {
+          showToast('❌ Gagal: ' + (res.error || 'Periksa Page ID & Token'), 'error');
+        }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    async function testPostInstagram() {
+      showToast('Mengirim test postingan ke Instagram...', 'success');
+      try {
+        const res = await apiPost('testInstagram', {});
+        if (res.success) {
+          showToast('✅ Berhasil posting ke Instagram Bisnis!', 'success');
+          if (res.url) window.open(res.url, '_blank');
+        } else {
+          showToast('❌ Gagal: ' + (res.error || 'Periksa IG Account ID & Token'), 'error');
+        }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
 
     // ==================== INIT ====================
