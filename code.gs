@@ -1657,6 +1657,19 @@ function postManual(produkNama, keyword, row) {
         } catch(eIg) {}
       }
       
+      // 4. Post ke Facebook Group (ISOLATED)
+      if (String(config.POST_TO_FB_GROUP) === 'true' && config.FB_GROUP_ID && config.FB_PAGE_ACCESS_TOKEN) {
+        try {
+          const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
+          const groupCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info / Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Link Katalog: ${resBlogger.url}` : '');
+          const resGroup = postKeFacebookGroup(groupCaption, heroThumb || heroLink, resBlogger.url || '');
+          if (resGroup && resGroup.success) {
+            const grpTag = resGroup.groupId ? `FB Group (${resGroup.groupId})` : 'FB Group';
+            channelLogs.push(grpTag);
+          }
+        } catch(eGrp) {}
+      }
+      
       const channelStr = channelLogs.length > 0 ? ` [${channelLogs.join(', ')}]` : '';
       const retryTag = attempt > 1 ? ` (Retry ke-${attempt})` : '';
       addLog(produkNama, keyword, 'Sukses (Manual)' + channelStr + retryTag, resBlogger.url || '', '');
