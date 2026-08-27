@@ -184,10 +184,10 @@
               <div style="background:#f8f9fa;padding:10px 14px;border-radius:8px;border:1px solid #e0e0e0;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
                   <span style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;"><i class="fas fa-users" style="color:#0d8af0"></i> FB Group</span>
-                  <span id="stGroupBadge" class="badge badge-info" style="font-size:10px;">Jadwal Acak</span>
+                  <span id="stGroupBadge" class="badge badge-info" style="font-size:10px;">Rolling Harian</span>
                 </div>
-                <div style="font-size:14px;font-weight:700;margin-top:3px;" id="stGroupSchedule">Memuat...</div>
-                <div style="font-size:11px;color:var(--text-sec);margin-top:2px;" id="stGroupTarget">Jam Target: -</div>
+                <div style="font-size:18px;font-weight:700;" id="stGroupCount">0 <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ 0 post</span></div>
+                <div style="font-size:11px;color:var(--text-sec);margin-top:2px;" id="stGroupTarget">Memuat status rolling...</div>
               </div>
             </div>
           </div>
@@ -576,21 +576,20 @@
           </div>
         </div>
 
-        <!-- PENGATURAN 2: FACEBOOK GROUP (KHUSUS GRUP & ANTI-BAN) -->
+        <!-- PENGATURAN 2: FACEBOOK GROUP (SMART ROLLING ENGINE) -->
         <div class="card" style="border-left:4px solid #0d8af0;">
           <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
             <h3>👥 Pengaturan Facebook Group (Grup & Komunitas)</h3>
-            <span class="badge" style="background:#e8f4fd;color:#0d8af0;font-size:11px;">Anti-Spam & Anti-Kick Protection</span>
+            <span class="badge" style="background:#e8f4fd;color:#0d8af0;font-size:11px;">Smart Rolling Engine</span>
           </div>
           <div class="card-body">
             <!-- Anti-Kick Protection Guide -->
             <div style="background:#e8f4fd;border:1px solid #b6e0fe;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#035388;line-height:1.5;">
-              <strong style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:13px;"><i class="fas fa-shield-alt"></i> Protokol Anti-Kick & Anti-Spam Grup Facebook</strong>
-              Posting ke grup setiap hari berisiko tinggi membuat akun Anda dikeluarkan admin atau diblokir Facebook. Sistem ini dirancang khusus:
+              <strong style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:13px;"><i class="fas fa-sync-alt"></i> Sistem Rolling Cerdas (Aktif Harian, Aman per Grup)</strong>
+              Sistem memposting <strong>setiap hari ke grup yang berbeda secara bergilir</strong>. Namun untuk <strong>setiap 1 ID grup</strong>, postingan baru hanya akan masuk minimal setelah masa jeda grup tersebut selesai (misal 3 hari sekali).
               <ul style="margin:6px 0 0 18px;padding:0;">
-                <li>Hanya memposting <strong>1x setiap interval hari yang dipilih</strong> (contoh: 1x tiap 3 hari).</li>
-                <li>Waktu posting <strong>diacak secara otomatis</strong> (misal jam 11:24, 14:48, 19:15) agar terlihat seperti manusia.</li>
-                <li>Jika memasukkan banyak Group ID, sistem <strong>merotasi 1 grup per jadwal (Round-Robin)</strong>.</li>
+                <li><strong>Akun Tetap Aktif Harian:</strong> Setiap hari tetap ada postingan promosi yang berjalan ke Facebook Group.</li>
+                <li><strong>Anti-Spam per Grup:</strong> Admin grup tidak akan melihat spam karena tiap grup individual diberi jarak aman beberapa hari.</li>
               </ul>
             </div>
 
@@ -603,26 +602,33 @@
             </div>
 
             <div class="form-group">
-              <label><i class="fas fa-users" style="color:#0d8af0;"></i> Facebook Group ID(s) <small style="font-weight:normal;color:#888">(Bisa lebih dari 1 ID, pisahkan dengan koma atau baris baru)</small></label>
-              <textarea class="form-control" id="cfgFbGroupId" rows="2" placeholder="Contoh: 123456789012345, 987654321098765"></textarea>
-              <small style="color:#888">Dapatkan ID Grup dari URL grup Facebook Anda (misal: facebook.com/groups/<strong>123456789012345</strong>). Jika diisi banyak ID, sistem akan memposting bergiliran.</small>
+              <label><i class="fas fa-users" style="color:#0d8af0;"></i> Daftar Facebook Group ID(s) <small style="font-weight:normal;color:#888">(Masukkan semua ID grup Anda, pisahkan dengan koma atau baris baru)</small></label>
+              <textarea class="form-control" id="cfgFbGroupId" rows="3" placeholder="Contoh: 123456789012345, 987654321098765, 554433221100998"></textarea>
+              <small style="color:#888">Dapatkan ID Grup dari URL grup Facebook Anda (misal: facebook.com/groups/<strong>123456789012345</strong>). Sistem otomatis merotasi ke grup yang paling lama belum diposting.</small>
             </div>
 
-            <div class="form-group">
-              <label><i class="fas fa-calendar-alt" style="color:#0d8af0;"></i> Frekuensi Posting ke Facebook Group</label>
-              <select class="form-control" id="cfgFbGroupInterval">
-                <option value="2">1x Setiap 2 Hari Sekali</option>
-                <option value="3" selected>1x Setiap 3 Hari Sekali (Paling Disarankan / Anti-Ban)</option>
-                <option value="4">1x Setiap 4 Hari Sekali</option>
-                <option value="5">1x Setiap 5 Hari Sekali</option>
-                <option value="7">1x Seminggu Sekali</option>
-              </select>
-              <small style="color:#888">Diposting jam acak, maksimal 1 post per hari jadwal.</small>
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fas fa-bullhorn" style="color:#0d8af0;"></i> Kuota Post Grup / Hari (Total Semua Grup)</label>
+                <input type="number" class="form-control" id="cfgMaxFbGroupPost" min="1" max="10" value="2">
+                <small style="color:#888">Berapa postingan grup yang dikirim akun per hari (disarankan: 1–3 post/hari)</small>
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-history" style="color:#0d8af0;"></i> Interval Jeda per 1 ID Grup</label>
+                <select class="form-control" id="cfgFbGroupInterval">
+                  <option value="2">1x per 2 Hari per Grup</option>
+                  <option value="3" selected>1x per 3 Hari per Grup (Paling Disarankan)</option>
+                  <option value="4">1x per 4 Hari per Grup</option>
+                  <option value="5">1x per 5 Hari per Grup</option>
+                  <option value="7">1x Seminggu per Grup</option>
+                </select>
+                <small style="color:#888">Grup yang sama tidak akan diposting ulang sebelum jeda ini lewat.</small>
+              </div>
             </div>
 
             <!-- Testing Button FB Group -->
             <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
-              <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostFacebookGroup()"><i class="fas fa-users"></i> Test Post FB Group Sekarang</button>
+              <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostFacebookGroup()"><i class="fas fa-users"></i> Test Post FB Group (Grup Giliran Berikutnya)</button>
             </div>
           </div>
         </div>
@@ -1021,18 +1027,20 @@
             if (document.getElementById('stIgCount')) {
               document.getElementById('stIgCount').innerHTML = `${pq.countIg || 0} <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ ${pq.targetIg || 5} post</span>`;
             }
-            if (document.getElementById('stGroupSchedule')) {
-              const todayStr = new Date().toISOString().split('T')[0];
-              let schedText = pq.nextGroupSchedule || todayStr;
-              if (schedText === todayStr) {
-                schedText = (pq.countGroup >= 1) ? '✅ Selesai Hari Ini' : '⏳ Terjadwal Hari Ini';
-              } else {
-                schedText = `📅 ${schedText}`;
-              }
-              document.getElementById('stGroupSchedule').textContent = schedText;
+            if (document.getElementById('stGroupCount')) {
+              document.getElementById('stGroupCount').innerHTML = `${pq.countGroup || 0} <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ ${pq.targetGroup || 2} post</span>`;
             }
-            if (document.getElementById('stGroupTarget') && pq.groupTargetTimeStr) {
-              document.getElementById('stGroupTarget').textContent = `Target Jam: ~${pq.groupTargetTimeStr} WIB`;
+            if (document.getElementById('stGroupTarget')) {
+              if (pq.nextGroupInfo) {
+                if (pq.nextGroupInfo.isEligible) {
+                  document.getElementById('stGroupTarget').innerHTML = `🟢 Target: <strong>${pq.nextGroupInfo.groupId}</strong> (${pq.nextGroupInfo.eligibleCount} siap)`;
+                } else {
+                  const rDate = pq.nextGroupInfo.nextReadyDateStr ? pq.nextGroupInfo.nextReadyDateStr.substring(5) : 'segera';
+                  document.getElementById('stGroupTarget').innerHTML = `⏳ Jeda aktif (Ready: ${rDate})`;
+                }
+              } else {
+                document.getElementById('stGroupTarget').textContent = `Interval ${pq.groupIntervalDays || 3} hari per grup`;
+              }
             }
           }
           
@@ -2221,6 +2229,7 @@
         if (document.getElementById('cfgFbGroupId')) document.getElementById('cfgFbGroupId').value = cfg.FB_GROUP_ID || '';
         if (document.getElementById('cfgMaxFbPost')) document.getElementById('cfgMaxFbPost').value = cfg.MAX_FB_POST_PER_DAY || 5;
         if (document.getElementById('cfgMaxIgPost')) document.getElementById('cfgMaxIgPost').value = cfg.MAX_IG_POST_PER_DAY || 5;
+        if (document.getElementById('cfgMaxFbGroupPost')) document.getElementById('cfgMaxFbGroupPost').value = cfg.MAX_FB_GROUP_POST_PER_DAY || 2;
         if (document.getElementById('cfgFbGroupInterval')) document.getElementById('cfgFbGroupInterval').value = cfg.FB_GROUP_INTERVAL_DAYS || 3;
         
         toggleDriveFolder();
@@ -2290,6 +2299,7 @@
         FB_GROUP_ID: document.getElementById('cfgFbGroupId')?.value.trim() || '',
         MAX_FB_POST_PER_DAY: parseInt(document.getElementById('cfgMaxFbPost')?.value) || 5,
         MAX_IG_POST_PER_DAY: parseInt(document.getElementById('cfgMaxIgPost')?.value) || 5,
+        MAX_FB_GROUP_POST_PER_DAY: parseInt(document.getElementById('cfgMaxFbGroupPost')?.value) || 2,
         FB_GROUP_INTERVAL_DAYS: parseInt(document.getElementById('cfgFbGroupInterval')?.value) || 3
       };
       

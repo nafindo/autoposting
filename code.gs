@@ -33,6 +33,7 @@ const DEFAULT_CONFIG = {
   FB_GROUP_ID: '',
   MAX_FB_POST_PER_DAY: 5,
   MAX_IG_POST_PER_DAY: 5,
+  MAX_FB_GROUP_POST_PER_DAY: 2,
   FB_GROUP_INTERVAL_DAYS: 3
 };
 
@@ -147,7 +148,7 @@ function getConfig() {
   
   const data = sheet.getDataRange().getValues();
   const config = { ...DEFAULT_CONFIG };
-  const numFields = ['MIN_POST_PER_DAY', 'MAX_POST_PER_DAY', 'JAM_AKTIF_MULAI', 'JAM_AKTIF_SELESAI', 'TRIGGER_INTERVAL_MINUTES', 'KEYWORD_REFRESH_HOUR', 'MIN_DELAY_MINUTES', 'MAX_DELAY_MINUTES', 'POSTS_PER_BATCH', 'MAX_FB_POST_PER_DAY', 'MAX_IG_POST_PER_DAY', 'FB_GROUP_INTERVAL_DAYS'];
+  const numFields = ['MIN_POST_PER_DAY', 'MAX_POST_PER_DAY', 'JAM_AKTIF_MULAI', 'JAM_AKTIF_SELESAI', 'TRIGGER_INTERVAL_MINUTES', 'KEYWORD_REFRESH_HOUR', 'MIN_DELAY_MINUTES', 'MAX_DELAY_MINUTES', 'POSTS_PER_BATCH', 'MAX_FB_POST_PER_DAY', 'MAX_IG_POST_PER_DAY', 'MAX_FB_GROUP_POST_PER_DAY', 'FB_GROUP_INTERVAL_DAYS'];
 
   for (let i = 1; i < data.length; i++) {
     const key = String(data[i][0] || '').trim();
@@ -1507,27 +1508,18 @@ function buatPostinganOtomatis() {
           }
         }
 
-        // 4. Post ke Facebook Group (ISOLATED - Safe Multi-Day Cooldown & Round-Robin Rotation)
+        // 4. Post ke Facebook Group (ISOLATED - Smart Per-Group Rolling Engine)
         if (String(config.POST_TO_FB_GROUP) === 'true' && config.FB_GROUP_ID && config.FB_PAGE_ACCESS_TOKEN && quotaStatus.canPostFbGroup) {
           try {
             const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
             const groupCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info / Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Link Katalog: ${resBlogger.url}` : '');
-            const resGroup = postKeFacebookGroup(groupCaption, heroThumb || heroLink, resBlogger.url || '');
+            const targetGrpId = quotaStatus.nextGroupInfo ? quotaStatus.nextGroupInfo.groupId : '';
+            const resGroup = postKeFacebookGroup(groupCaption, heroThumb || heroLink, resBlogger.url || '', targetGrpId);
             if (resGroup && resGroup.success) {
               const grpTag = resGroup.groupId ? `FB Group (${resGroup.groupId})` : 'FB Group';
               channelLogs.push(grpTag);
-              props.setProperty('COUNT_FB_GROUP', '1');
-              
-              const todayStr = Utilities.formatDate(nowTs, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-              props.setProperty('LAST_FB_GROUP_POST_DATE', todayStr);
-              
-              // Jadwalkan posting FB Group berikutnya (hari ini + interval hari)
-              const nextDate = new Date(nowTs.getTime());
-              nextDate.setDate(nextDate.getDate() + (quotaStatus.groupIntervalDays || 3));
-              const nextDateStr = Utilities.formatDate(nextDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-              props.setProperty('NEXT_FB_GROUP_SCHEDULE_DATE', nextDateStr);
-              
-              console.log(`✅ Berhasil post ke Facebook Group [${resGroup.groupId}]. Jadwal posting grup berikutnya: ${nextDateStr}`);
+              props.setProperty('COUNT_FB_GROUP', String(quotaStatus.countGroup + 1));
+              console.log(`✅ Berhasil post ke Facebook Group [${resGroup.groupId}] (${quotaStatus.countGroup + 1}/${quotaStatus.targetGroup} hari ini).`);
             } else {
               console.warn('⚠️ Gagal post ke Facebook Group: ' + (resGroup.error || ''));
             }
@@ -2353,21 +2345,94 @@ function testInstagramPost() {
   return postKeInstagram(testCaption, testImg);
 }
 
-function postKeFacebookGroup(caption, imageUrl, linkUrl) {
+function getNextEligibleFbGroup() {
   const config = getConfig();
   const groupIds = String(config.FB_GROUP_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
-  const token = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
-  
-  if (groupIds.length === 0 || !token) {
-    return { success: false, error: 'Facebook Group ID atau Access Token belum diisi di Pengaturan' };
-  }
+  if (groupIds.length === 0) return null;
   
   const props = PropertiesService.getScriptProperties();
-  let currentIndex = Number(props.getProperty('LAST_FB_GROUP_INDEX') || '0');
-  if (isNaN(currentIndex) || currentIndex >= groupIds.length || currentIndex < 0) currentIndex = 0;
+  let history = {};
+  try {
+    history = JSON.parse(props.getProperty('FB_GROUP_HISTORY') || '{}');
+  } catch(e) {
+    history = {};
+  }
   
-  // Pilih 1 grup giliran saat ini (Round-Robin) untuk mencegah spamming serentak
-  const targetGroupId = groupIds[currentIndex];
+  const intervalDays = Math.max(1, Number(config.FB_GROUP_INTERVAL_DAYS) || 3);
+  const now = new Date();
+  
+  // Hitung status jeda hari untuk setiap Group ID
+  const groupStatusList = groupIds.map(id => {
+    const lastTimeStr = history[id];
+    let diffDays = 999999;
+    let lastTime = null;
+    if (lastTimeStr) {
+      lastTime = new Date(lastTimeStr);
+      diffDays = (now.getTime() - lastTime.getTime()) / (1000 * 60 * 60 * 24);
+    }
+    return {
+      groupId: id,
+      lastTime: lastTime,
+      diffDays: diffDays,
+      isEligible: diffDays >= intervalDays
+    };
+  });
+  
+  // Filter grup yang masa jedanya sudah selesai (eligible)
+  const eligibleGroups = groupStatusList.filter(g => g.isEligible);
+  
+  if (eligibleGroups.length > 0) {
+    // Urutkan dari yang paling lama belum diposting (atau belum pernah sama sekali)
+    eligibleGroups.sort((a, b) => {
+      if (!a.lastTime && !b.lastTime) return 0;
+      if (!a.lastTime) return -1;
+      if (!b.lastTime) return 1;
+      return a.lastTime.getTime() - b.lastTime.getTime();
+    });
+    
+    return {
+      groupId: eligibleGroups[0].groupId,
+      eligibleCount: eligibleGroups.length,
+      totalGroups: groupIds.length,
+      isEligible: true,
+      lastPostTime: eligibleGroups[0].lastTime
+    };
+  }
+  
+  // Jika semua grup masih dalam masa jeda, cari grup yang paling cepat selesai cooldown
+  groupStatusList.sort((a, b) => (b.diffDays - a.diffDays));
+  const nearest = groupStatusList[0];
+  const remainingDays = Math.max(0.1, intervalDays - nearest.diffDays);
+  const nextReadyDate = new Date(now.getTime() + remainingDays * 24 * 60 * 60 * 1000);
+  
+  return {
+    groupId: nearest.groupId,
+    eligibleCount: 0,
+    totalGroups: groupIds.length,
+    isEligible: false,
+    nextReadyDate: nextReadyDate,
+    nextReadyDateStr: Utilities.formatDate(nextReadyDate, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
+  };
+}
+
+function postKeFacebookGroup(caption, imageUrl, linkUrl, specificGroupId) {
+  const config = getConfig();
+  const token = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
+  
+  let targetGroupId = specificGroupId;
+  if (!targetGroupId) {
+    const nextGroup = getNextEligibleFbGroup();
+    if (nextGroup && nextGroup.groupId) {
+      targetGroupId = nextGroup.groupId;
+    } else {
+      const groupIds = String(config.FB_GROUP_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
+      targetGroupId = groupIds[0] || '';
+    }
+  }
+  
+  if (!targetGroupId || !token) {
+    return { success: false, error: 'Facebook Group ID atau Access Token belum diisi di Pengaturan' };
+  }
   
   try {
     let url = '';
@@ -2406,10 +2471,21 @@ function postKeFacebookGroup(caption, imageUrl, linkUrl) {
       return { success: false, groupId: targetGroupId, error: errMsg };
     } else {
       const postId = json.post_id || json.id;
-      // Perbarui giliran grup untuk jadwal berikutnya
-      const nextIndex = (currentIndex + 1) % groupIds.length;
-      props.setProperty('LAST_FB_GROUP_INDEX', String(nextIndex));
-      return { success: true, groupId: targetGroupId, id: postId, nextIndex };
+      
+      // Catat waktu sukses posting ke grup spesifik ini di riwayat rolling
+      const props = PropertiesService.getScriptProperties();
+      const nowTs = new Date().toISOString();
+      let history = {};
+      try {
+        history = JSON.parse(props.getProperty('FB_GROUP_HISTORY') || '{}');
+      } catch(e) {
+        history = {};
+      }
+      history[targetGroupId] = nowTs;
+      props.setProperty('FB_GROUP_HISTORY', JSON.stringify(history));
+      props.setProperty('LAST_FB_GROUP_POST_TIME', nowTs);
+      
+      return { success: true, groupId: targetGroupId, id: postId, url: `https://www.facebook.com/groups/${targetGroupId}/posts/${postId}` };
     }
   } catch(e) {
     return { success: false, groupId: targetGroupId, error: e.toString() };
@@ -2418,7 +2494,9 @@ function postKeFacebookGroup(caption, imageUrl, linkUrl) {
 
 function testFacebookGroupPost() {
   const config = getConfig();
-  const testMsg = `🚀 [TEST AUTOPOST] Halo Anggota Grup!\n\nSistem autoposting Facebook Group dari Nafindo berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
+  const nextGroup = getNextEligibleFbGroup();
+  const grpInfo = nextGroup ? `[Target Grup: ${nextGroup.groupId}]` : '';
+  const testMsg = `🚀 [TEST AUTOPOST] Halo Anggota Grup ${grpInfo}!\n\nSistem autoposting Facebook Group dari Nafindo berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
   return postKeFacebookGroup(testMsg, '', '');
 }
 
@@ -2449,13 +2527,6 @@ function getPlatformQuotaStatus() {
     const minIg = Math.max(1, Math.min(3, Math.floor(maxIg * 0.6)));
     const targetIg = Math.floor(Math.random() * (maxIg - minIg + 1)) + minIg;
     props.setProperty('TARGET_IG', String(targetIg));
-    
-    // Tentukan jam & menit acak untuk posting FB Group
-    const randomGroupHour = Math.floor(Math.random() * (jamSelesai - jamMulai)) + jamMulai;
-    const randomGroupMinute = Math.floor(Math.random() * 50) + 5;
-    props.setProperty('FB_GROUP_TARGET_HOUR', String(randomGroupHour));
-    props.setProperty('FB_GROUP_TARGET_MINUTE', String(randomGroupMinute));
-    console.log(`🎯 Multi-Platform Target Hari Ini (${todayStr}): FB Page: ${targetFb} post, IG: ${targetIg} post, FB Group: Jam ${randomGroupHour}:${randomGroupMinute}`);
   }
   
   const countFb = Number(props.getProperty('COUNT_FB_PAGE') || '0');
@@ -2464,12 +2535,10 @@ function getPlatformQuotaStatus() {
   
   const targetFb = Number(props.getProperty('TARGET_FB_PAGE') || config.MAX_FB_POST_PER_DAY || '5');
   const targetIg = Number(props.getProperty('TARGET_IG') || config.MAX_IG_POST_PER_DAY || '5');
-  const groupTargetHour = Number(props.getProperty('FB_GROUP_TARGET_HOUR') || '11');
-  const groupTargetMinute = Number(props.getProperty('FB_GROUP_TARGET_MINUTE') || '30');
+  const targetGroup = Math.min(10, Math.max(1, Number(config.MAX_FB_GROUP_POST_PER_DAY) || 2));
   
   const now = new Date();
   const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
   
   // Anti-Spam Interval Check for FB Page & IG (Distribusi merata sepanjang jam aktif)
   const activeHours = Math.max(1, jamSelesai - jamMulai);
@@ -2482,17 +2551,14 @@ function getPlatformQuotaStatus() {
   const lastIgTime = props.getProperty('LAST_IG_POST_TIME');
   const canPostIg = countIg < targetIg && (!lastIgTime || (now.getTime() - new Date(lastIgTime).getTime() >= igIntervalMins * 60 * 1000));
   
-  // FB Group: Multi-Day Cooldown & Random Hour Check (Anti-Ban & Anti-Kick)
-  const groupIntervalDays = Math.max(1, Number(config.FB_GROUP_INTERVAL_DAYS) || 3);
-  let nextGroupSchedule = props.getProperty('NEXT_FB_GROUP_SCHEDULE_DATE');
-  if (!nextGroupSchedule) {
-    nextGroupSchedule = todayStr;
-    props.setProperty('NEXT_FB_GROUP_SCHEDULE_DATE', nextGroupSchedule);
-  }
+  // FB Group: Rolling per ID Group & Jeda Antar Post Grup Hari Ini
+  const nextGroupInfo = getNextEligibleFbGroup();
+  const lastGroupPostTime = props.getProperty('LAST_FB_GROUP_POST_TIME');
+  // Jeda aman antar-post grup dalam 1 hari (minimal 90 menit)
+  const groupMinIntervalMs = 90 * 60 * 1000;
+  const isGroupIntervalMet = !lastGroupPostTime || (now.getTime() - new Date(lastGroupPostTime).getTime() >= groupMinIntervalMs);
   
-  const isGroupScheduledDay = todayStr >= nextGroupSchedule;
-  const isGroupTimeReached = (currentHour > groupTargetHour) || (currentHour === groupTargetHour && currentMinute >= groupTargetMinute);
-  const canPostFbGroup = isGroupScheduledDay && countGroup < 1 && isGroupTimeReached;
+  const canPostFbGroup = nextGroupInfo && nextGroupInfo.isEligible && countGroup < targetGroup && isGroupIntervalMet;
   
   return {
     canPostFb,
@@ -2500,12 +2566,8 @@ function getPlatformQuotaStatus() {
     canPostFbGroup,
     countFb, targetFb,
     countIg, targetIg,
-    countGroup,
-    nextGroupSchedule,
-    groupTargetHour,
-    groupTargetMinute,
-    groupIntervalDays,
-    isGroupScheduledDay,
-    groupTargetTimeStr: `${String(groupTargetHour).padStart(2, '0')}:${String(groupTargetMinute).padStart(2, '0')}`
+    countGroup, targetGroup,
+    nextGroupInfo,
+    groupIntervalDays: Number(config.FB_GROUP_INTERVAL_DAYS) || 3
   };
 }
