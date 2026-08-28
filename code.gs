@@ -28,6 +28,7 @@ const DEFAULT_CONFIG = {
   POST_TO_INSTAGRAM: 'false',
   POST_TO_FB_GROUP: 'false',
   FB_PAGE_ID: '',
+  FB_PAGE_POST_MODE: 'all',
   FB_PAGE_ACCESS_TOKEN: '',
   IG_ACCOUNT_ID: '',
   FB_GROUP_ID: '',
@@ -2208,7 +2209,7 @@ function testDriveAuth() {
 
 function diagnosaMetaToken() {
   const config = getConfig();
-  const pageId = String(config.FB_PAGE_ID || '').trim();
+  const rawPageIds = String(config.FB_PAGE_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
   const pageToken = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
   const igId = String(config.IG_ACCOUNT_ID || '').trim();
   const groupIds = String(config.FB_GROUP_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
@@ -2225,8 +2226,7 @@ function diagnosaMetaToken() {
     permissions: [],
     pageFound: false,
     pageName: '',
-    pageId: pageId,
-    pageError: '',
+    pagesStatus: [],
     connectedIgId: '',
     igFound: false,
     igUsername: '',
@@ -2259,23 +2259,27 @@ function diagnosaMetaToken() {
       }
     } catch(e) {}
     
-    // 3. Cek Page ID via /{pageId}
-    if (pageId) {
-      try {
-        const pageRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${pageId}?fields=name,id,is_published,instagram_business_account&access_token=${encodeURIComponent(pageToken)}`, { muteHttpExceptions: true });
-        const pageJson = JSON.parse(pageRes.getContentText());
-        if (!pageJson.error && pageJson.id) {
-          report.pageFound = true;
-          report.pageName = pageJson.name;
-          if (pageJson.instagram_business_account) {
-            report.connectedIgId = pageJson.instagram_business_account.id;
+    // 3. Cek Page IDs via /{pageId} (Mendukung banyak Halaman FB)
+    if (rawPageIds.length > 0) {
+      report.pagesStatus = rawPageIds.map(pId => {
+        try {
+          const pageRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${pId}?fields=name,id,is_published,instagram_business_account&access_token=${encodeURIComponent(pageToken)}`, { muteHttpExceptions: true });
+          const pageJson = JSON.parse(pageRes.getContentText());
+          if (!pageJson.error && pageJson.id) {
+            if (pageJson.instagram_business_account && !report.connectedIgId) {
+              report.connectedIgId = pageJson.instagram_business_account.id;
+            }
+            return { id: pId, name: pageJson.name, status: 'OK', igId: pageJson.instagram_business_account ? pageJson.instagram_business_account.id : '' };
+          } else {
+            return { id: pId, name: '', status: 'Error', error: pageJson.error ? pageJson.error.message : 'ID Halaman tidak cocok' };
           }
-        } else {
-          report.pageError = pageJson.error ? pageJson.error.message : 'Page ID tidak cocok atau tidak ditemukan';
+        } catch(e) {
+          return { id: pId, status: 'Error', error: e.toString() };
         }
-      } catch(e) {
-        report.pageError = e.toString();
-      }
+      });
+      const validPages = report.pagesStatus.filter(p => p.status === 'OK');
+      report.pageFound = validPages.length > 0;
+      report.pageName = validPages.map(p => p.name).join(', ');
     }
     
     // 4. Cek IG ID via /{igId}
@@ -2319,11 +2323,21 @@ function diagnosaMetaToken() {
 
 function postKeFacebook(caption, imageUrl, linkUrl) {
   const config = getConfig();
-  const pageId = String(config.FB_PAGE_ID || '').trim();
-  const pageToken = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
+  const rawPageIds = String(config.FB_PAGE_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
+  const mainToken = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
+  const postMode = String(config.FB_PAGE_POST_MODE || 'all'); // 'all' (semua) atau 'rotate' (bergiliran)
   
-  if (!pageId || !pageToken) {
+  if (rawPageIds.length === 0 || !mainToken) {
     return { success: false, error: 'Facebook Page ID atau Access Token belum diisi di Pengaturan' };
+  }
+  
+  let targetPageIds = rawPageIds;
+  if (postMode === 'rotate' && rawPageIds.length > 1) {
+    const props = PropertiesService.getScriptProperties();
+    let idx = Number(props.getProperty('LAST_FB_PAGE_INDEX') || '0');
+    if (isNaN(idx) || idx >= rawPageIds.length || idx < 0) idx = 0;
+    targetPageIds = [rawPageIds[idx]];
+    props.setProperty('LAST_FB_PAGE_INDEX', String((idx + 1) % rawPageIds.length));
   }
   
   let finalMessage = caption || '';
@@ -2331,62 +2345,91 @@ function postKeFacebook(caption, imageUrl, linkUrl) {
     finalMessage = finalMessage.trim() + '\n\n🌐 ' + linkUrl;
   }
   
-  // Opsi 1: Coba upload Foto jika ada imageUrl publik
-  if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+  const results = [];
+  
+  for (const pageId of targetPageIds) {
+    let pageToken = mainToken;
+    
+    // Coba dapatkan Page Access Token spesifik untuk Page ID ini jika token utama adalah User Token
     try {
-      const photoUrl = `https://graph.facebook.com/v19.0/${pageId}/photos`;
-      const photoRes = UrlFetchApp.fetch(photoUrl, {
-        method: 'post',
-        payload: {
-          url: imageUrl,
-          caption: finalMessage,
-          access_token: pageToken
-        },
-        muteHttpExceptions: true
-      });
-      
-      const pCode = photoRes.getResponseCode();
-      const pText = photoRes.getContentText();
-      const pJson = JSON.parse(pText);
-      
-      if (!pJson.error && (pJson.id || pJson.post_id)) {
-        const postId = pJson.post_id || pJson.id;
-        return { success: true, id: postId, url: `https://www.facebook.com/${postId}` };
+      const ptRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${pageId}?fields=access_token&access_token=${encodeURIComponent(mainToken)}`, { muteHttpExceptions: true });
+      const ptJson = JSON.parse(ptRes.getContentText());
+      if (ptJson.access_token) {
+        pageToken = ptJson.access_token;
       }
-      
-      console.warn(`Post photo FB Page gagal (${pCode}): ${pText}. Mencoba fallback ke postingan feed teks...`);
-    } catch(ePhoto) {
-      console.warn(`Exception post photo: ${ePhoto}. Mencoba fallback ke feed...`);
+    } catch(ePt) {}
+    
+    let posted = false;
+    let postResObj = null;
+    
+    // Opsi 1: Coba upload Foto jika ada imageUrl publik
+    if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+      try {
+        const photoUrl = `https://graph.facebook.com/v19.0/${pageId}/photos`;
+        const photoRes = UrlFetchApp.fetch(photoUrl, {
+          method: 'post',
+          payload: {
+            url: imageUrl,
+            caption: finalMessage,
+            access_token: pageToken
+          },
+          muteHttpExceptions: true
+        });
+        
+        const pJson = JSON.parse(photoRes.getContentText());
+        if (!pJson.error && (pJson.id || pJson.post_id)) {
+          const postId = pJson.post_id || pJson.id;
+          postResObj = { success: true, pageId: pageId, id: postId, url: `https://www.facebook.com/${postId}` };
+          posted = true;
+        }
+      } catch(ePhoto) {}
     }
+    
+    // Opsi 2 (atau Fallback): Post ke Feed Halaman
+    if (!posted) {
+      try {
+        const feedUrl = `https://graph.facebook.com/v19.0/${pageId}/feed`;
+        const feedRes = UrlFetchApp.fetch(feedUrl, {
+          method: 'post',
+          payload: {
+            message: finalMessage,
+            access_token: pageToken
+          },
+          muteHttpExceptions: true
+        });
+        
+        const code = feedRes.getResponseCode();
+        const text = feedRes.getContentText();
+        const json = JSON.parse(text);
+        
+        if (code < 300 && !json.error) {
+          const postId = json.post_id || json.id;
+          postResObj = { success: true, pageId: pageId, id: postId, url: `https://www.facebook.com/${postId}` };
+        } else {
+          const errMsg = json.error ? (json.error.message || JSON.stringify(json.error)) : ('FB API Error (' + code + '): ' + text);
+          postResObj = { success: false, pageId: pageId, error: errMsg };
+        }
+      } catch(eFeed) {
+        postResObj = { success: false, pageId: pageId, error: eFeed.toString() };
+      }
+    }
+    
+    results.push(postResObj);
   }
   
-  // Opsi 2 (atau Fallback): Post ke Feed Halaman
-  try {
-    const feedUrl = `https://graph.facebook.com/v19.0/${pageId}/feed`;
-    const feedRes = UrlFetchApp.fetch(feedUrl, {
-      method: 'post',
-      payload: {
-        message: finalMessage,
-        access_token: pageToken
-      },
-      muteHttpExceptions: true
-    });
-    
-    const code = feedRes.getResponseCode();
-    const text = feedRes.getContentText();
-    const json = JSON.parse(text);
-    
-    if (code >= 300 || json.error) {
-      const errMsg = json.error ? (json.error.message || JSON.stringify(json.error)) : ('FB API Error (' + code + '): ' + text);
-      console.error('Facebook Post Error: ' + errMsg);
-      return { success: false, error: errMsg };
-    }
-    
-    const postId = json.post_id || json.id;
-    return { success: true, id: postId, url: `https://www.facebook.com/${postId}` };
-  } catch(e) {
-    console.error('Exception postKeFacebook: ' + e);
-    return { success: false, error: e.toString() };
+  const successList = results.filter(r => r && r.success);
+  if (successList.length > 0) {
+    return {
+      success: true,
+      pageResults: results,
+      url: successList[0].url,
+      id: successList[0].id,
+      successCount: successList.length,
+      totalTarget: targetPageIds.length
+    };
+  } else {
+    const firstErr = results[0] ? results[0].error : 'Gagal memposting ke Halaman';
+    return { success: false, error: firstErr, pageResults: results };
   }
 }
 
