@@ -1526,7 +1526,7 @@ function buatPostinganOtomatis() {
         if (String(config.POST_TO_FACEBOOK) === 'true' && config.FB_PAGE_ID && config.FB_PAGE_ACCESS_TOKEN && quotaStatus.canPostFb && quotaStatus.nextFbPageInfo) {
           try {
             const targetPageId = quotaStatus.nextFbPageInfo.pageId;
-            const fbCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info & Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Baca selengkapnya: ${resBlogger.url}` : '');
+            const fbCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info & Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Website & Katalog Resmi: ${resBlogger.url}` : '');
             const resFb = postKeFacebook(fbCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '', targetPageId);
             if (resFb && resFb.success) {
               const pName = resFb.pageName ? `FB: ${resFb.pageName}` : `FB (${targetPageId})`;
@@ -1561,7 +1561,7 @@ function buatPostinganOtomatis() {
         // 4. Post ke Facebook Group (Smart Per-Group Rolling Engine)
         if (String(config.POST_TO_FB_GROUP) === 'true' && config.FB_GROUP_ID && config.FB_PAGE_ACCESS_TOKEN && quotaStatus.canPostFbGroup) {
           try {
-            const groupCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info / Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Link Katalog: ${resBlogger.url}` : '');
+            const groupCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info / Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Website & Katalog Resmi: ${resBlogger.url}` : '');
             const targetGrpId = quotaStatus.nextGroupInfo ? quotaStatus.nextGroupInfo.groupId : '';
             const resGroup = postKeFacebookGroup(groupCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '', targetGrpId);
             if (resGroup && resGroup.success) {
@@ -1685,7 +1685,7 @@ function postManual(produkNama, keyword, row) {
       if (String(config.POST_TO_FACEBOOK) === 'true' && config.FB_PAGE_ID && config.FB_PAGE_ACCESS_TOKEN) {
         try {
           const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
-          const fbCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info & Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Link Blog: ${resBlogger.url}` : '');
+          const fbCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info & Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Website & Katalog Resmi: ${resBlogger.url}` : '');
           const resFb = postKeFacebook(fbCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '');
           if (resFb && resFb.success) {
             const pTag = resFb.pageName ? `FB: ${resFb.pageName}` : 'FB';
@@ -1710,7 +1710,7 @@ function postManual(produkNama, keyword, row) {
       if (String(config.POST_TO_FB_GROUP) === 'true' && config.FB_GROUP_ID && config.FB_PAGE_ACCESS_TOKEN) {
         try {
           const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
-          const groupCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info / Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Link Katalog: ${resBlogger.url}` : '');
+          const groupCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info / Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Website & Katalog Resmi: ${resBlogger.url}` : '');
           const resGroup = postKeFacebookGroup(groupCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '');
           if (resGroup && resGroup.success) {
             const grpTag = resGroup.groupId ? `FB Group (${resGroup.groupId})` : 'FB Group';
