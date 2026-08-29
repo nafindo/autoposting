@@ -28,14 +28,18 @@ const DEFAULT_CONFIG = {
   POST_TO_INSTAGRAM: 'false',
   POST_TO_FB_GROUP: 'false',
   FB_PAGE_ID: '',
-  FB_PAGE_POST_MODE: 'all',
+  FB_PAGE_POST_MODE: 'rotate',
   FB_PAGE_ACCESS_TOKEN: '',
   IG_ACCOUNT_ID: '',
   FB_GROUP_ID: '',
-  MAX_FB_POST_PER_DAY: 5,
-  MAX_IG_POST_PER_DAY: 5,
+  MIN_FB_POST_PER_DAY: 4,
+  MAX_FB_POST_PER_DAY: 7,
+  MIN_IG_POST_PER_DAY: 4,
+  MAX_IG_POST_PER_DAY: 7,
   MAX_FB_GROUP_POST_PER_DAY: 2,
-  FB_GROUP_INTERVAL_DAYS: 3
+  FB_GROUP_INTERVAL_DAYS: 3,
+  FB_COOLDOWN_MINUTES: 60,
+  IG_COOLDOWN_MINUTES: 60
 };
 
 // ==================== WEB APP ====================
@@ -150,7 +154,12 @@ function getConfig() {
   
   const data = sheet.getDataRange().getValues();
   const config = { ...DEFAULT_CONFIG };
-  const numFields = ['MIN_POST_PER_DAY', 'MAX_POST_PER_DAY', 'JAM_AKTIF_MULAI', 'JAM_AKTIF_SELESAI', 'TRIGGER_INTERVAL_MINUTES', 'KEYWORD_REFRESH_HOUR', 'MIN_DELAY_MINUTES', 'MAX_DELAY_MINUTES', 'POSTS_PER_BATCH', 'MAX_FB_POST_PER_DAY', 'MAX_IG_POST_PER_DAY', 'MAX_FB_GROUP_POST_PER_DAY', 'FB_GROUP_INTERVAL_DAYS'];
+  const numFields = [
+    'MIN_POST_PER_DAY', 'MAX_POST_PER_DAY', 'JAM_AKTIF_MULAI', 'JAM_AKTIF_SELESAI',
+    'TRIGGER_INTERVAL_MINUTES', 'KEYWORD_REFRESH_HOUR', 'MIN_DELAY_MINUTES', 'MAX_DELAY_MINUTES',
+    'POSTS_PER_BATCH', 'MIN_FB_POST_PER_DAY', 'MAX_FB_POST_PER_DAY', 'MIN_IG_POST_PER_DAY', 'MAX_IG_POST_PER_DAY',
+    'MAX_FB_GROUP_POST_PER_DAY', 'FB_GROUP_INTERVAL_DAYS', 'FB_COOLDOWN_MINUTES', 'IG_COOLDOWN_MINUTES'
+  ];
 
   for (let i = 1; i < data.length; i++) {
     const key = String(data[i][0] || '').trim();
@@ -213,7 +222,7 @@ function saveConfig(configObj) {
   sheet.appendRow(['Key', 'Value']);
   Object.entries(configObj).forEach(([k, v]) => {
     // Tulis sebagai plain text jika ID atau nomor WA
-    if (k === 'BLOG_ID' || k === 'WHATSAPP_NUMBER' || k === 'SPREADSHEET_ID') {
+    if (k === 'BLOG_ID' || k === 'WHATSAPP_NUMBER' || k === 'SPREADSHEET_ID' || k === 'FB_PAGE_ID' || k === 'IG_ACCOUNT_ID' || k === 'FB_GROUP_ID') {
       sheet.appendRow([k, "'" + String(v).replace(/^'+/, '')]);
     } else {
       sheet.appendRow([k, v]);
@@ -235,9 +244,11 @@ function saveConfig(configObj) {
     props.setProperty('MAX_POST_PER_DAY', String(configObj.MAX_POST_PER_DAY));
   }
   
-  // Re-generate target hari ini agar sesuai dengan rentang baru
+  // Reset token kuota platform agar mengocok target acak baru sesuai range baru
+  props.deleteProperty('PLATFORM_QUOTA_DATE');
   props.deleteProperty('TODAY_TARGET_POSTS');
   getTodayTargetPosts();
+  getPlatformQuotaStatus();
   
   // Jika trigger auto-posting sedang aktif, jadwalkan ulang dengan jeda baru sekarang juga
   const mode = props.getProperty('TRIGGER_MODE');
@@ -825,6 +836,7 @@ function getProdukData(sheetName) {
   const specs = [];
   const varian = [];
   const gallery = [];
+  const medsosEligiblePhotos = [];
   
   for (let i = 1; i < data.length; i++) {
     if (data[i][0]) {
@@ -843,13 +855,47 @@ function getProdukData(sheetName) {
         urlPost: data[i][10] || ''
       });
     }
-    if (data[i][2]) heroImages.push(...parseLinks(data[i][2]));
+    
+    // 1. Hero Images (Kolom C)
+    if (data[i][2]) {
+      const rawLines = String(data[i][2]).split(/[\n,]/).map(l => l.trim()).filter(Boolean);
+      rawLines.forEach(l => {
+        if (l.startsWith('http')) {
+          const isMedsos = l.toLowerCase().includes('#medsos') || l.toLowerCase().includes('#post') || l.toLowerCase().includes('#ig') || l.toLowerCase().includes('[medsos]');
+          const pureUrl = l.split('|')[0].trim();
+          heroImages.push(l);
+          if (isMedsos && !medsosEligiblePhotos.includes(pureUrl)) medsosEligiblePhotos.push(pureUrl);
+        }
+      });
+    }
+    
+    // 2. Spesifikasi (Kolom I)
     if (data[i][8]) specs.push(String(data[i][8]).trim());
+    
+    // 3. Varian (Kolom D link, Kolom E ket)
     if (data[i][3]) {
       const links = parseLinks(data[i][3]);
-      links.forEach(l => varian.push({ link: l, ket: data[i][4] || '' }));
+      const ketRaw = String(data[i][4] || '').trim();
+      const isMedsos = ketRaw.toLowerCase().includes('#medsos') || ketRaw.toLowerCase().includes('#post') || ketRaw.toLowerCase().includes('#ig') || ketRaw.toLowerCase().includes('[medsos]');
+      links.forEach(l => {
+        const pureUrl = l.split('|')[0].trim();
+        varian.push({ link: pureUrl, ket: ketRaw, isMedsos: isMedsos });
+        if (isMedsos && !medsosEligiblePhotos.includes(pureUrl)) medsosEligiblePhotos.push(pureUrl);
+      });
     }
-    if (data[i][9]) gallery.push(...parseLinks(data[i][9]));
+    
+    // 4. Gallery (Kolom J)
+    if (data[i][9]) {
+      const rawLines = String(data[i][9]).split(/[\n,]/).map(l => l.trim()).filter(Boolean);
+      rawLines.forEach(l => {
+        if (l.startsWith('http')) {
+          const isMedsos = l.toLowerCase().includes('#medsos') || l.toLowerCase().includes('#post') || l.toLowerCase().includes('#ig') || l.toLowerCase().includes('[medsos]');
+          const pureUrl = l.split('|')[0].trim();
+          gallery.push(l);
+          if (isMedsos && !medsosEligiblePhotos.includes(pureUrl)) medsosEligiblePhotos.push(pureUrl);
+        }
+      });
+    }
   }
   
   // Cari label produk dari MASTER_PRODUK
@@ -879,7 +925,8 @@ function getProdukData(sheetName) {
     varian,
     gallery: [...new Set(gallery)],
     galleryVarian: varian,
-    saranWarna: [...new Set(gallery)]
+    saranWarna: [...new Set(gallery)],
+    medsosEligiblePhotos: [...new Set(medsosEligiblePhotos)]
   };
 }
 
@@ -1470,20 +1517,21 @@ function buatPostinganOtomatis() {
         if (postBloggerEnabled) channelLogs.push('Blogger');
         
         const quotaStatus = getPlatformQuotaStatus();
-        const nowTs = new Date();
-        const props = PropertiesService.getScriptProperties();
+        const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
         
-        // 2. Post ke Facebook Page (ISOLATED - Safe Try-Catch & Anti-Spam Quota Max 10/day)
-        if (String(config.POST_TO_FACEBOOK) === 'true' && config.FB_PAGE_ID && config.FB_PAGE_ACCESS_TOKEN && quotaStatus.canPostFb) {
+        // Pilih Smart Photo untuk Sosial Media (Varian/Gallery/Hero/Free AI Fallback)
+        const socialImgUrl = getSmartSocialPhoto(pData, item, aiData);
+        
+        // 2. Post ke Facebook Page (Per-Page Independent Rolling Engine)
+        if (String(config.POST_TO_FACEBOOK) === 'true' && config.FB_PAGE_ID && config.FB_PAGE_ACCESS_TOKEN && quotaStatus.canPostFb && quotaStatus.nextFbPageInfo) {
           try {
-            const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
+            const targetPageId = quotaStatus.nextFbPageInfo.pageId;
             const fbCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info & Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Baca selengkapnya: ${resBlogger.url}` : '');
-            const resFb = postKeFacebook(fbCaption, heroThumb || heroLink, resBlogger.url || '');
+            const resFb = postKeFacebook(fbCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '', targetPageId);
             if (resFb && resFb.success) {
-              channelLogs.push('FB Page');
-              props.setProperty('COUNT_FB_PAGE', String(quotaStatus.countFb + 1));
-              props.setProperty('LAST_FB_POST_TIME', nowTs.toISOString());
-              console.log(`✅ Berhasil post ke Facebook Page (${quotaStatus.countFb + 1}/${quotaStatus.targetFb})`);
+              const pName = resFb.pageName ? `FB: ${resFb.pageName}` : `FB (${targetPageId})`;
+              channelLogs.push(pName);
+              console.log(`✅ Berhasil post ke Facebook Page [${targetPageId}] (${resFb.count}/${resFb.target} hari ini)`);
             } else {
               console.warn('⚠️ Gagal post ke Facebook Page: ' + (resFb.error || ''));
             }
@@ -1492,16 +1540,16 @@ function buatPostinganOtomatis() {
           }
         }
         
-        // 3. Post ke Instagram (ISOLATED - Safe Try-Catch & Anti-Spam Quota Max 10/day)
-        if (String(config.POST_TO_INSTAGRAM) === 'true' && config.IG_ACCOUNT_ID && config.FB_PAGE_ACCESS_TOKEN && (heroThumb || heroLink) && quotaStatus.canPostIg) {
+        // 3. Post ke Instagram (Per-Account Independent Rolling Engine)
+        if (String(config.POST_TO_INSTAGRAM) === 'true' && config.IG_ACCOUNT_ID && config.FB_PAGE_ACCESS_TOKEN && (socialImgUrl || heroThumb || heroLink) && quotaStatus.canPostIg && quotaStatus.nextIgInfo) {
           try {
+            const targetIgId = quotaStatus.nextIgInfo.igId;
             const igCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Order via WhatsApp: ${config.WHATSAPP_NUMBER}`;
-            const resIg = postKeInstagram(igCaption, heroThumb || heroLink);
+            const resIg = postKeInstagram(igCaption, socialImgUrl || heroThumb || heroLink, targetIgId);
             if (resIg && resIg.success) {
-              channelLogs.push('IG');
-              props.setProperty('COUNT_IG', String(quotaStatus.countIg + 1));
-              props.setProperty('LAST_IG_POST_TIME', nowTs.toISOString());
-              console.log(`✅ Berhasil post ke Instagram (${quotaStatus.countIg + 1}/${quotaStatus.targetIg})`);
+              const igName = resIg.username ? `IG: @${resIg.username}` : `IG (${targetIgId})`;
+              channelLogs.push(igName);
+              console.log(`✅ Berhasil post ke Instagram [${targetIgId}] (${resIg.count}/${resIg.target} hari ini)`);
             } else {
               console.warn('⚠️ Gagal post ke Instagram: ' + (resIg.error || ''));
             }
@@ -1510,18 +1558,16 @@ function buatPostinganOtomatis() {
           }
         }
 
-        // 4. Post ke Facebook Group (ISOLATED - Smart Per-Group Rolling Engine)
+        // 4. Post ke Facebook Group (Smart Per-Group Rolling Engine)
         if (String(config.POST_TO_FB_GROUP) === 'true' && config.FB_GROUP_ID && config.FB_PAGE_ACCESS_TOKEN && quotaStatus.canPostFbGroup) {
           try {
-            const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
             const groupCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info / Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Link Katalog: ${resBlogger.url}` : '');
             const targetGrpId = quotaStatus.nextGroupInfo ? quotaStatus.nextGroupInfo.groupId : '';
-            const resGroup = postKeFacebookGroup(groupCaption, heroThumb || heroLink, resBlogger.url || '', targetGrpId);
+            const resGroup = postKeFacebookGroup(groupCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '', targetGrpId);
             if (resGroup && resGroup.success) {
               const grpTag = resGroup.groupId ? `FB Group (${resGroup.groupId})` : 'FB Group';
               channelLogs.push(grpTag);
-              props.setProperty('COUNT_FB_GROUP', String(quotaStatus.countGroup + 1));
-              console.log(`✅ Berhasil post ke Facebook Group [${resGroup.groupId}] (${quotaStatus.countGroup + 1}/${quotaStatus.targetGroup} hari ini).`);
+              console.log(`✅ Berhasil post ke Facebook Group [${resGroup.groupId}] (${resGroup.count || ''})`);
             } else {
               console.warn('⚠️ Gagal post ke Facebook Group: ' + (resGroup.error || ''));
             }
@@ -1633,22 +1679,30 @@ function postManual(produkNama, keyword, row) {
       let channelLogs = [];
       if (postBloggerEnabled) channelLogs.push('Blogger');
       
+      const socialImgUrl = getSmartSocialPhoto(pData, { produkNama, keyword }, aiData);
+
       // 2. Post ke Facebook (ISOLATED)
       if (String(config.POST_TO_FACEBOOK) === 'true' && config.FB_PAGE_ID && config.FB_PAGE_ACCESS_TOKEN) {
         try {
           const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
           const fbCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info & Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Link Blog: ${resBlogger.url}` : '');
-          const resFb = postKeFacebook(fbCaption, heroThumb || heroLink, resBlogger.url || '');
-          if (resFb && resFb.success) channelLogs.push('FB');
+          const resFb = postKeFacebook(fbCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '');
+          if (resFb && resFb.success) {
+            const pTag = resFb.pageName ? `FB: ${resFb.pageName}` : 'FB';
+            channelLogs.push(pTag);
+          }
         } catch(eFb) {}
       }
       
       // 3. Post ke Instagram (ISOLATED)
-      if (String(config.POST_TO_INSTAGRAM) === 'true' && config.IG_ACCOUNT_ID && config.FB_PAGE_ACCESS_TOKEN && (heroThumb || heroLink)) {
+      if (String(config.POST_TO_INSTAGRAM) === 'true' && config.IG_ACCOUNT_ID && config.FB_PAGE_ACCESS_TOKEN && (socialImgUrl || heroThumb || heroLink)) {
         try {
           const igCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Order via WhatsApp: ${config.WHATSAPP_NUMBER}`;
-          const resIg = postKeInstagram(igCaption, heroThumb || heroLink);
-          if (resIg && resIg.success) channelLogs.push('IG');
+          const resIg = postKeInstagram(igCaption, socialImgUrl || heroThumb || heroLink);
+          if (resIg && resIg.success) {
+            const igTag = resIg.username ? `IG: @${resIg.username}` : 'IG';
+            channelLogs.push(igTag);
+          }
         } catch(eIg) {}
       }
       
@@ -1657,7 +1711,7 @@ function postManual(produkNama, keyword, row) {
         try {
           const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
           const groupCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info / Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Link Katalog: ${resBlogger.url}` : '');
-          const resGroup = postKeFacebookGroup(groupCaption, heroThumb || heroLink, resBlogger.url || '');
+          const resGroup = postKeFacebookGroup(groupCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '');
           if (resGroup && resGroup.success) {
             const grpTag = resGroup.groupId ? `FB Group (${resGroup.groupId})` : 'FB Group';
             channelLogs.push(grpTag);
@@ -1912,9 +1966,11 @@ TUGAS:
    - Call to Action (CTA) ke WhatsApp ${config.WHATSAPP_NUMBER}
    - 10-15 Hashtags (#) yang relevan & populer
    - Format Teks Bersih (Plain Text, TANPA tag HTML)
+3. VISUAL PROMPT (1 kalimat singkat bahasa Inggris untuk visual foto produk yang 100% relevan):
+   - Contoh: "modern interior room with clean minimalist ${nama} flooring, daylight, commercial architectural photography 8k"
 
 OUTPUT JSON:
-{"title":"...","description":"...","table":"...","socialCaption":"..."}`;
+{"title":"...","description":"...","table":"...","socialCaption":"...","visualPrompt":"..."}`;
 
   try {
     const res = UrlFetchApp.fetch(url, {
@@ -1943,6 +1999,49 @@ OUTPUT JSON:
     console.error('AI Error: ' + e);
     return null;
   }
+}
+
+/**
+ * Smart Social Media Photo Selector (Khusus Facebook & Instagram)
+ * 1. Prioritas 1: Foto yang dicentang Layak Medsos (dari Hero, Varian desain, atau Gallery)
+ * 2. Prioritas 2: Jika tidak ada centang khusus, fallback ke foto Gallery ruangan yang ada
+ * 3. Prioritas 3: Render AI Ruangan Terpasang Estetik (100% Gratis Pollinations Flux/SDXL - 0 Token)
+ */
+function getSmartSocialPhoto(pData, item, aiData) {
+  const pool = [];
+  
+  // Prioritas 1: Ambil semua foto yang ditandai centang "Medsos" oleh user (baik dari Hero, Varian, maupun Gallery)
+  if (pData && pData.medsosEligiblePhotos && pData.medsosEligiblePhotos.length > 0) {
+    pData.medsosEligiblePhotos.forEach(link => {
+      const img = getImageUrlFromLink(link);
+      if (img && !pool.includes(img)) pool.push(img);
+    });
+  }
+  
+  // Prioritas 2: Jika belum ada satupun foto yang dicentang medsos, gunakan foto dari Gallery jika ada
+  if (pool.length === 0 && pData && (pData.gallery || pData.saranWarna)) {
+    const gal = pData.gallery || pData.saranWarna || [];
+    gal.forEach(g => {
+      const img = getImageUrlFromLink(g);
+      if (img && !pool.includes(img)) pool.push(img);
+    });
+  }
+  
+  // Jika ditemukan foto di pool, pilih salah satu secara acak
+  if (pool.length > 0) {
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  
+  // Prioritas 3: Render AI Ruangan Terpasang Estetik jika sama sekali tidak ada foto yang layak
+  const prodName = item ? item.produkNama : 'Produk';
+  const kw = item ? item.keyword : 'Interior';
+  let visualPrompt = (aiData && aiData.visualPrompt) 
+    ? aiData.visualPrompt 
+    : `luxurious modern interior living room showcasing installed ${prodName} ${kw}, architectural photography, natural sunlight, aesthetic interior design 8k`;
+  
+  const cleanPrompt = encodeURIComponent(String(visualPrompt).substring(0, 150).replace(/[^a-zA-Z0-9\s,]/g, ''));
+  const randomSeed = Math.floor(Math.random() * 99999);
+  return `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1080&height=1080&nologo=true&seed=${randomSeed}`;
 }
 
 function buildModernTemplate(d) {
@@ -1981,7 +2080,8 @@ function buildModernTemplate(d) {
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:20px;margin-top:20px;">`;
     varianList.forEach(item => {
       const thumb = getImageUrlFromLink(item.link);
-      if (thumb) html += `<div style="border:1px solid #eee;padding:10px;border-radius:12px;background:#fff;text-align:center;"><a href="${item.link}" target="_blank"><img src="${thumb}" style="width:100%;height:180px;object-fit:cover;border-radius:8px;" /></a>${item.ket ? `<p style="margin:10px 0 0;font-size:13px;font-weight:bold;color:#555;">${item.ket}</p>` : ''}</div>`;
+      const cleanKet = String(item.ket || '').replace(/#medsos|#post|#ig|\[medsos\]/gi, '').trim();
+      if (thumb) html += `<div style="border:1px solid #eee;padding:10px;border-radius:12px;background:#fff;text-align:center;"><a href="${item.link}" target="_blank"><img src="${thumb}" style="width:100%;height:180px;object-fit:cover;border-radius:8px;" /></a>${cleanKet ? `<p style="margin:10px 0 0;font-size:13px;font-weight:bold;color:#555;">${cleanKet}</p>` : ''}</div>`;
     });
     html += `</div></div>`;
   }
@@ -1998,24 +2098,24 @@ function buildModernTemplate(d) {
 
 function postKeBlogger(title, content, labels) {
   const config = getConfig();
-  const blogId = String(config.BLOG_ID).trim();
+  const blogId = config.BLOG_ID;
   if (!blogId) {
+    console.error("postKeBlogger Error: BLOG_ID kosong di Pengaturan.");
     return { success: false, error: 'BLOG_ID belum diisi di Pengaturan' };
   }
-
-  // 1. Jika Advanced Service Blogger diaktifkan di Apps Script Services
+  
+  // 1. Menggunakan Blogger Advanced Service (OAuth2 bawaan Google Apps Script) jika tersedia
   if (typeof Blogger !== 'undefined' && Blogger.Posts && Blogger.Posts.insert) {
     try {
-      const res = Blogger.Posts.insert({
+      const postResource = {
         title: title || 'Untitled',
         content: content || '<p>No content</p>',
         labels: Array.isArray(labels) ? labels : ['Katalog']
-      }, blogId);
-      if (res && (res.id || res.url)) {
-        return { success: true, url: res.url || res.selfLink, id: res.id };
-      }
+      };
+      const res = Blogger.Posts.insert(postResource, blogId);
+      return { success: true, url: res.url, id: res.id };
     } catch(e) {
-      console.warn('Blogger Advanced Service gagal: ' + e + ', mencoba via REST API UrlFetchApp...');
+      console.warn("Blogger Advanced Service gagal, mencoba REST API via UrlFetch: " + e);
     }
   }
 
@@ -2068,7 +2168,7 @@ function parseLinks(raw) {
 
 function getImageUrlFromLink(url) {
   if (!url) return null;
-  url = String(url).trim();
+  url = String(url).split('|')[0].trim();
   if (url.includes('googleusercontent.com') || url.includes('blogger.com') || url.includes('bp.blogspot.com') || url.includes('cloudinary.com') || url.includes('imgbb.com') || url.includes('imgur.com')) {
     return url;
   }
@@ -2211,7 +2311,7 @@ function diagnosaMetaToken() {
   const config = getConfig();
   const rawPageIds = String(config.FB_PAGE_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
   const pageToken = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
-  const igId = String(config.IG_ACCOUNT_ID || '').trim();
+  const rawIgIds = String(config.IG_ACCOUNT_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
   const groupIds = String(config.FB_GROUP_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
   
   if (!pageToken) {
@@ -2230,7 +2330,7 @@ function diagnosaMetaToken() {
     connectedIgId: '',
     igFound: false,
     igUsername: '',
-    igError: '',
+    igAccountsStatus: [],
     groupsStatus: []
   };
   
@@ -2282,20 +2382,24 @@ function diagnosaMetaToken() {
       report.pageName = validPages.map(p => p.name).join(', ');
     }
     
-    // 4. Cek IG ID via /{igId}
-    if (igId) {
-      try {
-        const igRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${igId}?fields=username,name&access_token=${encodeURIComponent(pageToken)}`, { muteHttpExceptions: true });
-        const igJson = JSON.parse(igRes.getContentText());
-        if (!igJson.error && igJson.id) {
-          report.igFound = true;
-          report.igUsername = igJson.username || igJson.name || 'Connected';
-        } else {
-          report.igError = igJson.error ? igJson.error.message : 'IG Account ID tidak valid atau belum terhubung';
+    // 4. Cek IG IDs via /{igId} (Mendukung banyak Akun Instagram)
+    if (rawIgIds.length > 0) {
+      report.igAccountsStatus = rawIgIds.map(igId => {
+        try {
+          const igRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${igId}?fields=username,name&access_token=${encodeURIComponent(pageToken)}`, { muteHttpExceptions: true });
+          const igJson = JSON.parse(igRes.getContentText());
+          if (!igJson.error && igJson.id) {
+            return { id: igId, username: igJson.username || igJson.name || 'Connected', status: 'OK' };
+          } else {
+            return { id: igId, username: '', status: 'Error', error: igJson.error ? igJson.error.message : 'IG Account ID tidak valid atau belum terhubung' };
+          }
+        } catch(e) {
+          return { id: igId, status: 'Error', error: e.toString() };
         }
-      } catch(e) {
-        report.igError = e.toString();
-      }
+      });
+      const validIgs = report.igAccountsStatus.filter(i => i.status === 'OK');
+      report.igFound = validIgs.length > 0;
+      report.igUsername = validIgs.map(i => '@' + i.username).join(', ');
     }
     
     // 5. Cek FB Groups
@@ -2321,125 +2425,119 @@ function diagnosaMetaToken() {
   }
 }
 
-function postKeFacebook(caption, imageUrl, linkUrl) {
+function postKeFacebook(caption, imageUrl, linkUrl, specificPageId) {
   const config = getConfig();
   const rawPageIds = String(config.FB_PAGE_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
   const mainToken = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
-  const postMode = String(config.FB_PAGE_POST_MODE || 'all'); // 'all' (semua) atau 'rotate' (bergiliran)
   
   if (rawPageIds.length === 0 || !mainToken) {
     return { success: false, error: 'Facebook Page ID atau Access Token belum diisi di Pengaturan' };
   }
   
-  let targetPageIds = rawPageIds;
-  if (postMode === 'rotate' && rawPageIds.length > 1) {
-    const props = PropertiesService.getScriptProperties();
-    let idx = Number(props.getProperty('LAST_FB_PAGE_INDEX') || '0');
-    if (isNaN(idx) || idx >= rawPageIds.length || idx < 0) idx = 0;
-    targetPageIds = [rawPageIds[idx]];
-    props.setProperty('LAST_FB_PAGE_INDEX', String((idx + 1) % rawPageIds.length));
+  let targetPageId = specificPageId;
+  if (!targetPageId) {
+    const nextEligible = getNextEligibleFbPage();
+    targetPageId = (nextEligible && nextEligible.pageId) ? nextEligible.pageId : rawPageIds[0];
   }
+  
+  let pageToken = mainToken;
+  let pageName = '';
+  // Coba dapatkan Page Access Token spesifik untuk Page ID ini
+  try {
+    const ptRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${targetPageId}?fields=access_token,name&access_token=${encodeURIComponent(mainToken)}`, { muteHttpExceptions: true });
+    const ptJson = JSON.parse(ptRes.getContentText());
+    if (ptJson.access_token) {
+      pageToken = ptJson.access_token;
+    }
+    if (ptJson.name) {
+      pageName = ptJson.name;
+    }
+  } catch(ePt) {}
   
   let finalMessage = caption || '';
   if (linkUrl && !finalMessage.includes(linkUrl)) {
     finalMessage = finalMessage.trim() + '\n\n🌐 ' + linkUrl;
   }
   
-  const results = [];
+  let posted = false;
+  let postResObj = null;
   
-  for (const pageId of targetPageIds) {
-    let pageToken = mainToken;
-    
-    // Coba dapatkan Page Access Token spesifik untuk Page ID ini jika token utama adalah User Token
+  // Opsi 1: Coba upload Foto jika ada imageUrl publik
+  if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
     try {
-      const ptRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${pageId}?fields=access_token&access_token=${encodeURIComponent(mainToken)}`, { muteHttpExceptions: true });
-      const ptJson = JSON.parse(ptRes.getContentText());
-      if (ptJson.access_token) {
-        pageToken = ptJson.access_token;
+      const photoUrl = `https://graph.facebook.com/v19.0/${targetPageId}/photos`;
+      const photoRes = UrlFetchApp.fetch(photoUrl, {
+        method: 'post',
+        payload: {
+          url: imageUrl,
+          caption: finalMessage,
+          access_token: pageToken
+        },
+        muteHttpExceptions: true
+      });
+      
+      const pJson = JSON.parse(photoRes.getContentText());
+      if (!pJson.error && (pJson.id || pJson.post_id)) {
+        const postId = pJson.post_id || pJson.id;
+        postResObj = { success: true, pageId: targetPageId, pageName: pageName, id: postId, url: `https://www.facebook.com/${postId}` };
+        posted = true;
       }
-    } catch(ePt) {}
-    
-    let posted = false;
-    let postResObj = null;
-    
-    // Opsi 1: Coba upload Foto jika ada imageUrl publik
-    if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
-      try {
-        const photoUrl = `https://graph.facebook.com/v19.0/${pageId}/photos`;
-        const photoRes = UrlFetchApp.fetch(photoUrl, {
-          method: 'post',
-          payload: {
-            url: imageUrl,
-            caption: finalMessage,
-            access_token: pageToken
-          },
-          muteHttpExceptions: true
-        });
-        
-        const pJson = JSON.parse(photoRes.getContentText());
-        if (!pJson.error && (pJson.id || pJson.post_id)) {
-          const postId = pJson.post_id || pJson.id;
-          postResObj = { success: true, pageId: pageId, id: postId, url: `https://www.facebook.com/${postId}` };
-          posted = true;
-        }
-      } catch(ePhoto) {}
-    }
-    
-    // Opsi 2 (atau Fallback): Post ke Feed Halaman
-    if (!posted) {
-      try {
-        const feedUrl = `https://graph.facebook.com/v19.0/${pageId}/feed`;
-        const feedRes = UrlFetchApp.fetch(feedUrl, {
-          method: 'post',
-          payload: {
-            message: finalMessage,
-            access_token: pageToken
-          },
-          muteHttpExceptions: true
-        });
-        
-        const code = feedRes.getResponseCode();
-        const text = feedRes.getContentText();
-        const json = JSON.parse(text);
-        
-        if (code < 300 && !json.error) {
-          const postId = json.post_id || json.id;
-          postResObj = { success: true, pageId: pageId, id: postId, url: `https://www.facebook.com/${postId}` };
-        } else {
-          const errMsg = json.error ? (json.error.message || JSON.stringify(json.error)) : ('FB API Error (' + code + '): ' + text);
-          postResObj = { success: false, pageId: pageId, error: errMsg };
-        }
-      } catch(eFeed) {
-        postResObj = { success: false, pageId: pageId, error: eFeed.toString() };
-      }
-    }
-    
-    results.push(postResObj);
+    } catch(ePhoto) {}
   }
   
-  const successList = results.filter(r => r && r.success);
-  if (successList.length > 0) {
-    return {
-      success: true,
-      pageResults: results,
-      url: successList[0].url,
-      id: successList[0].id,
-      successCount: successList.length,
-      totalTarget: targetPageIds.length
-    };
+  // Opsi 2 (atau Fallback): Post ke Feed Halaman
+  if (!posted) {
+    try {
+      const feedUrl = `https://graph.facebook.com/v19.0/${targetPageId}/feed`;
+      const feedRes = UrlFetchApp.fetch(feedUrl, {
+        method: 'post',
+        payload: {
+          message: finalMessage,
+          access_token: pageToken
+        },
+        muteHttpExceptions: true
+      });
+      
+      const code = feedRes.getResponseCode();
+      const text = feedRes.getContentText();
+      const json = JSON.parse(text);
+      
+      if (code < 300 && !json.error) {
+        const postId = json.post_id || json.id;
+        postResObj = { success: true, pageId: targetPageId, pageName: pageName, id: postId, url: `https://www.facebook.com/${postId}` };
+      } else {
+        const errMsg = json.error ? (json.error.message || JSON.stringify(json.error)) : ('FB API Error (' + code + '): ' + text);
+        postResObj = { success: false, pageId: targetPageId, error: errMsg };
+      }
+    } catch(eFeed) {
+      postResObj = { success: false, pageId: targetPageId, error: eFeed.toString() };
+    }
+  }
+  
+  if (postResObj && postResObj.success) {
+    saveFbPagePostHistory(targetPageId);
+    const countInfo = getFbPageCountInfo(targetPageId);
+    postResObj.count = countInfo.count;
+    postResObj.target = countInfo.target;
+    return postResObj;
   } else {
-    const firstErr = results[0] ? results[0].error : 'Gagal memposting ke Halaman';
-    return { success: false, error: firstErr, pageResults: results };
+    return postResObj || { success: false, error: 'Gagal memposting ke Halaman FB' };
   }
 }
 
-function postKeInstagram(caption, imageUrl) {
+function postKeInstagram(caption, imageUrl, specificIgId) {
   const config = getConfig();
-  const igAccountId = String(config.IG_ACCOUNT_ID || '').trim();
+  const rawIgIds = String(config.IG_ACCOUNT_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
   const token = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
   
-  if (!igAccountId || !token) {
+  if (rawIgIds.length === 0 || !token) {
     return { success: false, error: 'Instagram Account ID atau Access Token belum diisi di Pengaturan' };
+  }
+  
+  let targetIgId = specificIgId;
+  if (!targetIgId) {
+    const nextEligible = getNextEligibleIgAccount();
+    targetIgId = (nextEligible && nextEligible.igId) ? nextEligible.igId : rawIgIds[0];
   }
   
   if (!imageUrl || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
@@ -2448,7 +2546,7 @@ function postKeInstagram(caption, imageUrl) {
   
   try {
     // Step 1: Buat Media Container
-    const containerUrl = `https://graph.facebook.com/v19.0/${igAccountId}/media`;
+    const containerUrl = `https://graph.facebook.com/v19.0/${targetIgId}/media`;
     const containerRes = UrlFetchApp.fetch(containerUrl, {
       method: 'post',
       payload: {
@@ -2465,8 +2563,8 @@ function postKeInstagram(caption, imageUrl) {
     
     if (cCode >= 300 || cJson.error || !cJson.id) {
       const errMsg = cJson.error ? (cJson.error.message || JSON.stringify(cJson.error)) : ('IG Container Error (' + cCode + '): ' + cText);
-      console.error('Instagram Container Error: ' + errMsg);
-      return { success: false, error: errMsg };
+      console.error(`Instagram (${targetIgId}) Container Error: ` + errMsg);
+      return { success: false, igId: targetIgId, error: errMsg };
     }
     
     const creationId = cJson.id;
@@ -2475,7 +2573,7 @@ function postKeInstagram(caption, imageUrl) {
     Utilities.sleep(3000);
     
     // Step 2: Publish Container
-    const publishUrl = `https://graph.facebook.com/v19.0/${igAccountId}/media_publish`;
+    const publishUrl = `https://graph.facebook.com/v19.0/${targetIgId}/media_publish`;
     const publishRes = UrlFetchApp.fetch(publishUrl, {
       method: 'post',
       payload: {
@@ -2491,28 +2589,124 @@ function postKeInstagram(caption, imageUrl) {
     
     if (pCode >= 300 || pJson.error || !pJson.id) {
       const errMsg = pJson.error ? (pJson.error.message || JSON.stringify(pJson.error)) : ('IG Publish Error (' + pCode + '): ' + pText);
-      console.error('Instagram Publish Error: ' + errMsg);
-      return { success: false, error: errMsg };
+      console.error(`Instagram (${targetIgId}) Publish Error: ` + errMsg);
+      return { success: false, igId: targetIgId, error: errMsg };
     }
     
     const igPostId = pJson.id;
-    return { success: true, id: igPostId, url: `https://www.instagram.com/p/${igPostId}/` };
+    saveIgPostHistory(targetIgId);
+    const countInfo = getIgCountInfo(targetIgId);
+    
+    return {
+      success: true,
+      igId: targetIgId,
+      id: igPostId,
+      url: `https://www.instagram.com/p/${igPostId}/`,
+      count: countInfo.count,
+      target: countInfo.target
+    };
   } catch(e) {
     console.error('Exception postKeInstagram: ' + e);
-    return { success: false, error: e.toString() };
+    return { success: false, igId: targetIgId, error: e.toString() };
   }
+}
+
+function saveFbPagePostHistory(pageId) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const nowTs = new Date().toISOString();
+    
+    // 1. Update history timestamp
+    let history = {};
+    try { history = JSON.parse(props.getProperty('FB_PAGE_HISTORY') || '{}'); } catch(e) { history = {}; }
+    history[pageId] = nowTs;
+    props.setProperty('FB_PAGE_HISTORY', JSON.stringify(history));
+    props.setProperty('LAST_FB_POST_TIME', nowTs);
+    
+    // 2. Increment today's count
+    let counts = {};
+    try { counts = JSON.parse(props.getProperty('FB_PAGE_COUNTS') || '{}'); } catch(e) { counts = {}; }
+    counts[pageId] = (Number(counts[pageId]) || 0) + 1;
+    props.setProperty('FB_PAGE_COUNTS', JSON.stringify(counts));
+  } catch(e) {}
+}
+
+function saveIgPostHistory(igId) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const nowTs = new Date().toISOString();
+    
+    // 1. Update history timestamp
+    let history = {};
+    try { history = JSON.parse(props.getProperty('IG_HISTORY') || '{}'); } catch(e) { history = {}; }
+    history[igId] = nowTs;
+    props.setProperty('IG_HISTORY', JSON.stringify(history));
+    props.setProperty('LAST_IG_POST_TIME', nowTs);
+    
+    // 2. Increment today's count
+    let counts = {};
+    try { counts = JSON.parse(props.getProperty('IG_COUNTS') || '{}'); } catch(e) { counts = {}; }
+    counts[igId] = (Number(counts[igId]) || 0) + 1;
+    props.setProperty('IG_COUNTS', JSON.stringify(counts));
+  } catch(e) {}
+}
+
+function getFbPageCountInfo(pageId) {
+  const props = PropertiesService.getScriptProperties();
+  const config = getConfig();
+  let counts = {};
+  let targets = {};
+  try { counts = JSON.parse(props.getProperty('FB_PAGE_COUNTS') || '{}'); } catch(e) {}
+  try { targets = JSON.parse(props.getProperty('FB_PAGE_TARGETS') || '{}'); } catch(e) {}
+  
+  const minFb = Math.max(1, Number(config.MIN_FB_POST_PER_DAY) || 4);
+  const maxFb = Math.max(minFb, Number(config.MAX_FB_POST_PER_DAY) || 7);
+  
+  const count = Number(counts[pageId]) || 0;
+  const target = Number(targets[pageId]) || maxFb;
+  return { count, target };
+}
+
+function getIgCountInfo(igId) {
+  const props = PropertiesService.getScriptProperties();
+  const config = getConfig();
+  let counts = {};
+  let targets = {};
+  try { counts = JSON.parse(props.getProperty('IG_COUNTS') || '{}'); } catch(e) {}
+  try { targets = JSON.parse(props.getProperty('IG_TARGETS') || '{}'); } catch(e) {}
+  
+  const minIg = Math.max(1, Number(config.MIN_IG_POST_PER_DAY) || 4);
+  const maxIg = Math.max(minIg, Number(config.MAX_IG_POST_PER_DAY) || 7);
+  
+  const count = Number(counts[igId]) || 0;
+  const target = Number(targets[igId]) || maxIg;
+  return { count, target };
+}
+
+function getNextEligibleFbPage() {
+  const quota = getPlatformQuotaStatus();
+  return quota.nextFbPageInfo;
+}
+
+function getNextEligibleIgAccount() {
+  const quota = getPlatformQuotaStatus();
+  return quota.nextIgInfo;
 }
 
 function testFacebookPost() {
   const config = getConfig();
-  const testMsg = `🚀 [TEST AUTOPOST] Halo dari Nafindo Autoposting!\n\nSistem integrasi Facebook Page berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
+  const nextEligible = getNextEligibleFbPage();
+  const pageTag = nextEligible ? `[Target Halaman: ${nextEligible.pageId}]` : '';
+  const testMsg = `🚀 [TEST AUTOPOST] Halo dari Nafindo Autoposting! ${pageTag}\n\nSistem integrasi Facebook Page berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
   return postKeFacebook(testMsg, '', '');
 }
 
 function testInstagramPost() {
   const config = getConfig();
+  const nextEligible = getNextEligibleIgAccount();
+  const igTag = nextEligible ? `[Target IG: ${nextEligible.igId}]` : '';
   const testImg = 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800';
-  const testCaption = `🚀 [TEST AUTOPOST] Halo Instagram!\n\nSistem integrasi Instagram Bisnis berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n#nafindo #testautopost`;
+  const testCaption = `🚀 [TEST AUTOPOST] Halo Instagram! ${igTag}\n\nSistem integrasi Instagram Bisnis berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n#nafindo #testautopost`;
   return postKeInstagram(testCaption, testImg);
 }
 
@@ -2691,68 +2885,175 @@ function getPlatformQuotaStatus() {
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const storedDate = props.getProperty('PLATFORM_QUOTA_DATE');
   
-  const jamMulai = Number(config.JAM_AKTIF_MULAI) || 8;
-  const jamSelesai = Number(config.JAM_AKTIF_SELESAI) || 22;
+  const rawPageIds = String(config.FB_PAGE_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
+  const rawIgIds = String(config.IG_ACCOUNT_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
+  const rawGroupIds = String(config.FB_GROUP_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
   
-  if (storedDate !== todayStr) {
-    // Reset kuota harian untuk hari baru
-    props.setProperty('PLATFORM_QUOTA_DATE', todayStr);
-    props.setProperty('COUNT_FB_PAGE', '0');
-    props.setProperty('COUNT_IG', '0');
-    props.setProperty('COUNT_FB_GROUP', '0');
-    
-    // Tentukan target acak harian FB Page (misal: 3 - 5 post/hari)
-    const maxFb = Math.min(10, Math.max(1, Number(config.MAX_FB_POST_PER_DAY) || 5));
-    const minFb = Math.max(1, Math.min(3, Math.floor(maxFb * 0.6)));
-    const targetFb = Math.floor(Math.random() * (maxFb - minFb + 1)) + minFb;
-    props.setProperty('TARGET_FB_PAGE', String(targetFb));
-    
-    // Tentukan target acak harian IG (misal: 3 - 5 post/hari)
-    const maxIg = Math.min(10, Math.max(1, Number(config.MAX_IG_POST_PER_DAY) || 5));
-    const minIg = Math.max(1, Math.min(3, Math.floor(maxIg * 0.6)));
-    const targetIg = Math.floor(Math.random() * (maxIg - minIg + 1)) + minIg;
-    props.setProperty('TARGET_IG', String(targetIg));
-  }
-  
-  const countFb = Number(props.getProperty('COUNT_FB_PAGE') || '0');
-  const countIg = Number(props.getProperty('COUNT_IG') || '0');
-  const countGroup = Number(props.getProperty('COUNT_FB_GROUP') || '0');
-  
-  const targetFb = Number(props.getProperty('TARGET_FB_PAGE') || config.MAX_FB_POST_PER_DAY || '5');
-  const targetIg = Number(props.getProperty('TARGET_IG') || config.MAX_IG_POST_PER_DAY || '5');
+  const minFb = Math.max(1, Number(config.MIN_FB_POST_PER_DAY) || 4);
+  const maxFb = Math.max(minFb, Number(config.MAX_FB_POST_PER_DAY) || 7);
+  const minIg = Math.max(1, Number(config.MIN_IG_POST_PER_DAY) || 4);
+  const maxIg = Math.max(minIg, Number(config.MAX_IG_POST_PER_DAY) || 7);
   const targetGroup = Math.min(10, Math.max(1, Number(config.MAX_FB_GROUP_POST_PER_DAY) || 2));
   
+  let fbTargets = {};
+  let fbCounts = {};
+  let igTargets = {};
+  let igCounts = {};
+  
+  if (storedDate !== todayStr) {
+    // Reset kuota harian per-Page & per-IG untuk hari baru
+    props.setProperty('PLATFORM_QUOTA_DATE', todayStr);
+    props.setProperty('FB_PAGE_COUNTS', '{}');
+    props.setProperty('IG_COUNTS', '{}');
+    props.setProperty('COUNT_FB_GROUP', '0');
+    
+    // Buat target harian acak independen untuk setiap Page ID
+    rawPageIds.forEach(pId => {
+      fbTargets[pId] = Math.floor(Math.random() * (maxFb - minFb + 1)) + minFb;
+    });
+    props.setProperty('FB_PAGE_TARGETS', JSON.stringify(fbTargets));
+    
+    // Buat target harian acak independen untuk setiap IG Account ID
+    rawIgIds.forEach(igId => {
+      igTargets[igId] = Math.floor(Math.random() * (maxIg - minIg + 1)) + minIg;
+    });
+    props.setProperty('IG_TARGETS', JSON.stringify(igTargets));
+  } else {
+    try { fbTargets = JSON.parse(props.getProperty('FB_PAGE_TARGETS') || '{}'); } catch(e) {}
+    try { fbCounts = JSON.parse(props.getProperty('FB_PAGE_COUNTS') || '{}'); } catch(e) {}
+    try { igTargets = JSON.parse(props.getProperty('IG_TARGETS') || '{}'); } catch(e) {}
+    try { igCounts = JSON.parse(props.getProperty('IG_COUNTS') || '{}'); } catch(e) {}
+    
+    // Pastikan jika ada page baru ditambahkan hari ini, beri target acak
+    let targetUpdated = false;
+    rawPageIds.forEach(pId => {
+      if (!fbTargets[pId]) {
+        fbTargets[pId] = Math.floor(Math.random() * (maxFb - minFb + 1)) + minFb;
+        targetUpdated = true;
+      }
+    });
+    if (targetUpdated) props.setProperty('FB_PAGE_TARGETS', JSON.stringify(fbTargets));
+    
+    let igTargetUpdated = false;
+    rawIgIds.forEach(igId => {
+      if (!igTargets[igId]) {
+        igTargets[igId] = Math.floor(Math.random() * (maxIg - minIg + 1)) + minIg;
+        igTargetUpdated = true;
+      }
+    });
+    if (igTargetUpdated) props.setProperty('IG_TARGETS', JSON.stringify(igTargets));
+  }
+  
   const now = new Date();
-  const currentHour = now.getHours();
+  let fbHistory = {};
+  try { fbHistory = JSON.parse(props.getProperty('FB_PAGE_HISTORY') || '{}'); } catch(e) {}
+  let igHistory = {};
+  try { igHistory = JSON.parse(props.getProperty('IG_HISTORY') || '{}'); } catch(e) {}
   
-  // Anti-Spam Interval Check for FB Page & IG (Distribusi merata sepanjang jam aktif)
-  const activeHours = Math.max(1, jamSelesai - jamMulai);
-  const fbIntervalMins = Math.max(60, Math.floor((activeHours * 60) / (targetFb + 1))) + Math.floor(Math.random() * 20);
-  const igIntervalMins = Math.max(60, Math.floor((activeHours * 60) / (targetIg + 1))) + Math.floor(Math.random() * 20);
+  const fbCooldownMins = Math.max(15, Number(config.FB_COOLDOWN_MINUTES) || 60);
+  const igCooldownMins = Math.max(15, Number(config.IG_COOLDOWN_MINUTES) || 60);
   
-  const lastFbTime = props.getProperty('LAST_FB_POST_TIME');
-  const canPostFb = countFb < targetFb && (!lastFbTime || (now.getTime() - new Date(lastFbTime).getTime() >= fbIntervalMins * 60 * 1000));
+  // 1. Hitung Status per-Page FB
+  const fbPageStatusList = rawPageIds.map(pId => {
+    const count = Number(fbCounts[pId]) || 0;
+    const target = Number(fbTargets[pId]) || maxFb;
+    const lastTimeStr = fbHistory[pId];
+    let diffMins = 999999;
+    let lastTime = null;
+    if (lastTimeStr) {
+      lastTime = new Date(lastTimeStr);
+      diffMins = (now.getTime() - lastTime.getTime()) / (1000 * 60);
+    }
+    const isQuotaLeft = count < target;
+    const isCooldownMet = diffMins >= fbCooldownMins;
+    return {
+      pageId: pId,
+      count,
+      target,
+      lastTime,
+      diffMins,
+      isEligible: isQuotaLeft && isCooldownMet,
+      isQuotaLeft
+    };
+  });
   
-  const lastIgTime = props.getProperty('LAST_IG_POST_TIME');
-  const canPostIg = countIg < targetIg && (!lastIgTime || (now.getTime() - new Date(lastIgTime).getTime() >= igIntervalMins * 60 * 1000));
+  const eligibleFbPages = fbPageStatusList.filter(p => p.isEligible);
+  if (eligibleFbPages.length > 0) {
+    eligibleFbPages.sort((a, b) => {
+      if (!a.lastTime && !b.lastTime) return 0;
+      if (!a.lastTime) return -1;
+      if (!b.lastTime) return 1;
+      return a.lastTime.getTime() - b.lastTime.getTime();
+    });
+  }
+  const nextFbPageInfo = eligibleFbPages.length > 0 ? eligibleFbPages[0] : null;
+  const totalFbCount = Object.values(fbCounts).reduce((a, b) => Number(a) + Number(b), 0);
+  const totalFbTarget = Object.values(fbTargets).reduce((a, b) => Number(a) + Number(b), 0);
+  const canPostFb = eligibleFbPages.length > 0;
   
-  // FB Group: Rolling per ID Group & Jeda Antar Post Grup Hari Ini
+  // 2. Hitung Status per-Akun IG
+  const igAccountStatusList = rawIgIds.map(igId => {
+    const count = Number(igCounts[igId]) || 0;
+    const target = Number(igTargets[igId]) || maxIg;
+    const lastTimeStr = igHistory[igId];
+    let diffMins = 999999;
+    let lastTime = null;
+    if (lastTimeStr) {
+      lastTime = new Date(lastTimeStr);
+      diffMins = (now.getTime() - lastTime.getTime()) / (1000 * 60);
+    }
+    const isQuotaLeft = count < target;
+    const isCooldownMet = diffMins >= igCooldownMins;
+    return {
+      igId,
+      count,
+      target,
+      lastTime,
+      diffMins,
+      isEligible: isQuotaLeft && isCooldownMet,
+      isQuotaLeft
+    };
+  });
+  
+  const eligibleIgs = igAccountStatusList.filter(p => p.isEligible);
+  if (eligibleIgs.length > 0) {
+    eligibleIgs.sort((a, b) => {
+      if (!a.lastTime && !b.lastTime) return 0;
+      if (!a.lastTime) return -1;
+      if (!b.lastTime) return 1;
+      return a.lastTime.getTime() - b.lastTime.getTime();
+    });
+  }
+  const nextIgInfo = eligibleIgs.length > 0 ? eligibleIgs[0] : null;
+  const totalIgCount = Object.values(igCounts).reduce((a, b) => Number(a) + Number(b), 0);
+  const totalIgTarget = Object.values(igTargets).reduce((a, b) => Number(a) + Number(b), 0);
+  const canPostIg = eligibleIgs.length > 0;
+  
+  // 3. FB Group Status
+  const countGroup = Number(props.getProperty('COUNT_FB_GROUP') || '0');
   const nextGroupInfo = getNextEligibleFbGroup();
   const lastGroupPostTime = props.getProperty('LAST_FB_GROUP_POST_TIME');
-  // Jeda aman antar-post grup dalam 1 hari (minimal 90 menit)
   const groupMinIntervalMs = 90 * 60 * 1000;
   const isGroupIntervalMet = !lastGroupPostTime || (now.getTime() - new Date(lastGroupPostTime).getTime() >= groupMinIntervalMs);
-  
   const canPostFbGroup = nextGroupInfo && nextGroupInfo.isEligible && countGroup < targetGroup && isGroupIntervalMet;
   
   return {
     canPostFb,
     canPostIg,
     canPostFbGroup,
-    countFb, targetFb,
-    countIg, targetIg,
-    countGroup, targetGroup,
+    nextFbPageInfo,
+    nextIgInfo,
     nextGroupInfo,
+    fbPages: fbPageStatusList,
+    igAccounts: igAccountStatusList,
+    totalFbCount, totalFbTarget,
+    totalIgCount, totalIgTarget,
+    countFb: totalFbCount, targetFb: totalFbTarget, // fallback compatibility
+    countIg: totalIgCount, targetIg: totalIgTarget,
+    countGroup, targetGroup,
+    minFbPerDay: minFb, maxFbPerDay: maxFb,
+    minIgPerDay: minIg, maxIgPerDay: maxIg,
+    fbCooldownMins, igCooldownMins,
     groupIntervalDays: Number(config.FB_GROUP_INTERVAL_DAYS) || 3
   };
 }

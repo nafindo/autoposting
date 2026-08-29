@@ -96,11 +96,17 @@
     .upload-card .btn-remove-img{position:absolute;top:4px;right:4px;width:22px;height:22px;background:rgba(234,67,53,0.9);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;border:none;font-weight:700;transition:transform .2s;line-height:1}
     .upload-card .btn-remove-img:hover{transform:scale(1.15)}
     .upload-card.uploading{display:flex;align-items:center;justify-content:center;background:#f8f9fa}
+    .upload-card .medsos-toggle{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.72);color:#fff;font-size:10px;padding:3px 4px;display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;user-select:none;font-weight:600;transition:background .2s}
+    .upload-card .medsos-toggle:hover{background:rgba(13,138,240,0.9)}
+    .upload-card .medsos-toggle input{margin:0;cursor:pointer;width:12px;height:12px;accent-color:#0d8af0}
     .varian-list-container{display:flex;flex-direction:column;gap:8px;margin-top:6px}
     .varian-row-item{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);padding:8px;border-radius:8px}
     .varian-thumb-box{width:60px;height:60px;border-radius:6px;border:1px dashed var(--border);background:#fff;position:relative;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;text-align:center}
     .varian-thumb-box img{width:100%;height:100%;object-fit:cover;display:block}
     .varian-thumb-box .upload-prompt{font-size:10px;color:var(--text-sec);line-height:1.2}
+    .varian-row-item .varian-medsos-toggle{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--border);padding:5px 8px;border-radius:6px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;user-select:none;white-space:nowrap;transition:all .2s}
+    .varian-row-item .varian-medsos-toggle:hover{border-color:#0d8af0;color:#0d8af0;background:#e8f0fe}
+    .varian-row-item .varian-medsos-toggle input{margin:0;cursor:pointer;width:13px;height:13px;accent-color:#0d8af0}
     .btn-toggle-link{background:none;border:none;color:var(--text-sec);font-size:11px;cursor:pointer;padding:2px 0;margin-top:4px;text-decoration:underline;display:inline-block}
     .btn-toggle-link:hover{color:var(--primary)}
     @media(max-width:768px){.sidebar{width:100%;position:relative;height:auto}.main{margin-left:0}.form-row{grid-template-columns:1fr}}
@@ -154,34 +160,36 @@
         <div class="card" style="margin-bottom:20px;border-left:4px solid var(--primary);">
           <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;">
             <h4 style="margin:0;font-size:14px;display:flex;align-items:center;gap:8px;">
-              <i class="fas fa-network-wired" style="color:var(--primary)"></i> Status Kuota Kanal & Anti-Spam Hari Ini
+              <i class="fas fa-network-wired" style="color:var(--primary)"></i> Status Kuota Kanal & Anti-Spam Hari Ini (Per-Akun Target)
             </h4>
             <span id="platformQuotaDateBadge" class="badge" style="background:#f1f3f4;color:var(--text);font-size:11px;">Hari Ini</span>
           </div>
           <div class="card-body" style="padding:14px 20px;">
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:12px;">
               <!-- FB Page Status -->
-              <div style="background:#f8f9fa;padding:10px 14px;border-radius:8px;border:1px solid #e0e0e0;">
+              <div style="background:#f8f9fa;padding:12px 14px;border-radius:8px;border:1px solid #e0e0e0;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                  <span style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;"><i class="fab fa-facebook" style="color:#1877f2"></i> FB Page</span>
-                  <span id="stFbBadge" class="badge badge-success" style="font-size:10px;">Aktif</span>
+                  <span style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;"><i class="fab fa-facebook" style="color:#1877f2"></i> FB Page (Per-Page)</span>
+                  <span id="stFbBadge" class="badge badge-success" style="font-size:10px;">Rolling</span>
                 </div>
-                <div style="font-size:18px;font-weight:700;" id="stFbCount">0 <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ 0 post</span></div>
-                <div style="font-size:11px;color:var(--text-sec);margin-top:2px;" id="stFbInterval">Jeda aman 1–2 jam</div>
+                <div style="font-size:18px;font-weight:700;" id="stFbCount">0 <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ 0 total post</span></div>
+                <div style="font-size:11px;color:var(--text-sec);margin-top:2px;" id="stFbInterval">Target per Page • Jeda aman 1–2 jam</div>
+                <div id="stFbPagesList" style="margin-top:6px;font-size:11px;display:flex;flex-direction:column;gap:3px;"></div>
               </div>
 
               <!-- IG Status -->
-              <div style="background:#f8f9fa;padding:10px 14px;border-radius:8px;border:1px solid #e0e0e0;">
+              <div style="background:#f8f9fa;padding:12px 14px;border-radius:8px;border:1px solid #e0e0e0;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                  <span style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;"><i class="fab fa-instagram" style="color:#e4405f"></i> Instagram</span>
-                  <span id="stIgBadge" class="badge badge-success" style="font-size:10px;">Aktif</span>
+                  <span style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;"><i class="fab fa-instagram" style="color:#e4405f"></i> Instagram (Per-Akun)</span>
+                  <span id="stIgBadge" class="badge badge-success" style="font-size:10px;">Rolling</span>
                 </div>
-                <div style="font-size:18px;font-weight:700;" id="stIgCount">0 <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ 0 post</span></div>
-                <div style="font-size:11px;color:var(--text-sec);margin-top:2px;" id="stIgInterval">Jeda aman 1–2 jam</div>
+                <div style="font-size:18px;font-weight:700;" id="stIgCount">0 <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ 0 total post</span></div>
+                <div style="font-size:11px;color:var(--text-sec);margin-top:2px;" id="stIgInterval">Target per Akun • Jeda aman 1–2 jam</div>
+                <div id="stIgAccountsList" style="margin-top:6px;font-size:11px;display:flex;flex-direction:column;gap:3px;"></div>
               </div>
 
               <!-- FB Group Status -->
-              <div style="background:#f8f9fa;padding:10px 14px;border-radius:8px;border:1px solid #e0e0e0;">
+              <div style="background:#f8f9fa;padding:12px 14px;border-radius:8px;border:1px solid #e0e0e0;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
                   <span style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;"><i class="fas fa-users" style="color:#0d8af0"></i> FB Group</span>
                   <span id="stGroupBadge" class="badge badge-info" style="font-size:10px;">Rolling Harian</span>
@@ -542,40 +550,62 @@
                 <small style="color:#888">Masukkan ID Halaman Facebook Anda (bisa 1 atau banyak Halaman sekaligus).</small>
               </div>
               <div class="form-group">
-                <label><i class="fas fa-layer-group" style="color:#1877f2;"></i> Mode Distribusi Postingan Halaman FB</label>
-                <select class="form-control" id="cfgFbPageMode">
-                  <option value="all" selected>📢 Kirim ke SEMUA Halaman Sekaligus (Broadcast)</option>
-                  <option value="rotate">🔄 Bergiliran / Rolling (Satu per Satu bergantian)</option>
-                </select>
-                <small style="color:#888">Pilih apakah tiap post masuk ke seluruh Halaman atau bergantian.</small>
+                <label><i class="fab fa-instagram" style="color:#e4405f;"></i> Instagram Business Account ID(s) <small style="font-weight:normal;color:#888">(Bisa lebih dari 1 IG, pisahkan koma/baris baru)</small></label>
+                <textarea class="form-control" id="cfgIgAccountId" rows="2" placeholder="Contoh: 17841405309218492, 17841405309999999"></textarea>
+                <small style="color:#888">ID Akun IG Bisnis yang terhubung dengan Halaman Facebook</small>
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group">
-                <label><i class="fab fa-instagram" style="color:#e4405f;"></i> Instagram Business Account ID</label>
-                <input type="text" class="form-control" id="cfgIgAccountId" placeholder="Contoh: 17841405309218492">
-                <small style="color:#888">ID Akun IG Bisnis yang terhubung dengan Halaman Facebook</small>
-              </div>
-              <div class="form-group">
                 <label><i class="fas fa-key" style="color:var(--primary);"></i> Meta Access Token (Long-Lived Token)</label>
                 <input type="password" class="form-control" id="cfgFbToken" placeholder="EAA...">
                 <small style="color:#888">Token akses Meta dari Graph API Explorer</small>
               </div>
+              <div class="form-group">
+                <label><i class="fas fa-layer-group" style="color:#1877f2;"></i> Mode Distribusi Postingan Halaman FB</label>
+                <select class="form-control" id="cfgFbPageMode">
+                  <option value="rotate" selected>🔄 Bergiliran Mandiri (Rolling per Page)</option>
+                  <option value="all">📢 Kirim ke SEMUA Halaman Sekaligus (Broadcast)</option>
+                </select>
+                <small style="color:#888">Sistem rolling otomatis membagi kuota merata antar-halaman.</small>
+              </div>
             </div>
 
-            <!-- Quota Tuning FB & IG -->
-            <div class="form-row" style="background:#f8f9fa;padding:12px;border-radius:8px;border:1px dashed #d2e3fc;margin-top:10px;">
-              <div class="form-group" style="margin-bottom:0;">
-                <label><i class="fab fa-facebook" style="color:#1877f2;"></i> Batas Harian FB Page (Post/Hari)</label>
-                <input type="number" class="form-control" id="cfgMaxFbPost" min="1" max="10" value="5">
-                <small style="color:#888">Saran aman: 3 - 8 post/hari (jeda 1-2 jam)</small>
+            <!-- Quota Tuning FB & IG (Per-Account Target & Cooldown) -->
+            <div style="background:#f8f9fa;padding:14px;border-radius:8px;border:1px dashed #d2e3fc;margin-top:10px;">
+              <div style="font-weight:600;font-size:13px;margin-bottom:10px;color:var(--text);display:flex;align-items:center;gap:6px;">
+                <i class="fas fa-sliders-h" style="color:var(--primary);"></i> Kuota Mandiri & Jeda Cooldown Aman per Akun
               </div>
-              <div class="form-group" style="margin-bottom:0;">
-                <label><i class="fab fa-instagram" style="color:#e4405f;"></i> Batas Harian Instagram (Post/Hari)</label>
-                <input type="number" class="form-control" id="cfgMaxIgPost" min="1" max="10" value="5">
-                <small style="color:#888">Saran aman: 3 - 8 post/hari (jeda 1-2 jam)</small>
+              <div class="form-row" style="margin-bottom:8px;">
+                <div class="form-group" style="margin-bottom:6px;">
+                  <label style="font-size:12px;"><i class="fab fa-facebook" style="color:#1877f2;"></i> Min Post / Page / Hari</label>
+                  <input type="number" class="form-control" id="cfgMinFbPost" min="1" max="20" value="4">
+                </div>
+                <div class="form-group" style="margin-bottom:6px;">
+                  <label style="font-size:12px;"><i class="fab fa-facebook" style="color:#1877f2;"></i> Max Post / Page / Hari</label>
+                  <input type="number" class="form-control" id="cfgMaxFbPost" min="1" max="20" value="7">
+                </div>
+                <div class="form-group" style="margin-bottom:6px;">
+                  <label style="font-size:12px;"><i class="fas fa-stopwatch" style="color:#1877f2;"></i> Jeda FB (Menit)</label>
+                  <input type="number" class="form-control" id="cfgFbCooldown" min="15" max="360" value="60">
+                </div>
               </div>
+              <div class="form-row" style="margin-bottom:0;">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label style="font-size:12px;"><i class="fab fa-instagram" style="color:#e4405f;"></i> Min Post / IG / Hari</label>
+                  <input type="number" class="form-control" id="cfgMinIgPost" min="1" max="20" value="4">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label style="font-size:12px;"><i class="fab fa-instagram" style="color:#e4405f;"></i> Max Post / IG / Hari</label>
+                  <input type="number" class="form-control" id="cfgMaxIgPost" min="1" max="20" value="7">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label style="font-size:12px;"><i class="fas fa-stopwatch" style="color:#e4405f;"></i> Jeda IG (Menit)</label>
+                  <input type="number" class="form-control" id="cfgIgCooldown" min="15" max="360" value="60">
+                </div>
+              </div>
+              <small style="color:#888;display:block;margin-top:8px;">💡 Setiap hari baru, tiap Page FB dan akun IG akan mendapatkan target kuota acak independen (misal: 4–7 post). Postingan akan dikirim bergantian mengikuti ritme Blogger saat jeda cooldown terpenuhi.</small>
             </div>
 
             <!-- Testing Buttons FB Page & IG -->
@@ -1034,11 +1064,47 @@
           if (stats.platformQuota) {
             const pq = stats.platformQuota;
             if (document.getElementById('stFbCount')) {
-              document.getElementById('stFbCount').innerHTML = `${pq.countFb || 0} <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ ${pq.targetFb || 5} post</span>`;
+              document.getElementById('stFbCount').innerHTML = `${pq.totalFbCount !== undefined ? pq.totalFbCount : (pq.countFb || 0)} <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ ${pq.totalFbTarget !== undefined ? pq.totalFbTarget : (pq.targetFb || 5)} total post</span>`;
             }
+            if (document.getElementById('stFbInterval')) {
+              document.getElementById('stFbInterval').textContent = `Target: ${pq.minFbPerDay || 4}–${pq.maxFbPerDay || 7} post/page • Jeda min. ${pq.fbCooldownMins || 60} mnt`;
+            }
+            const fbPagesListEl = document.getElementById('stFbPagesList');
+            if (fbPagesListEl) {
+              if (pq.fbPages && pq.fbPages.length > 0) {
+                fbPagesListEl.innerHTML = pq.fbPages.map(p => {
+                  const statusBadge = p.count >= p.target ? `<span style="color:#d93025;font-weight:600;">Selesai</span>` : (p.isEligible ? `<span style="color:#188038;font-weight:600;">Siap</span>` : `<span style="color:#f29900;font-weight:600;">Jeda</span>`);
+                  return `<div style="display:flex;justify-content:space-between;align-items:center;background:#fff;padding:3px 6px;border-radius:4px;border:1px solid #eee;font-size:11px;">
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px;" title="${p.pageId}">📄 ${p.pageId}</span>
+                    <span><strong>${p.count}</strong>/${p.target} ${statusBadge}</span>
+                  </div>`;
+                }).join('');
+              } else {
+                fbPagesListEl.innerHTML = '<span style="color:#999;font-size:10px;">Belum ada Page ID diisi</span>';
+              }
+            }
+
             if (document.getElementById('stIgCount')) {
-              document.getElementById('stIgCount').innerHTML = `${pq.countIg || 0} <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ ${pq.targetIg || 5} post</span>`;
+              document.getElementById('stIgCount').innerHTML = `${pq.totalIgCount !== undefined ? pq.totalIgCount : (pq.countIg || 0)} <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ ${pq.totalIgTarget !== undefined ? pq.totalIgTarget : (pq.targetIg || 5)} total post</span>`;
             }
+            if (document.getElementById('stIgInterval')) {
+              document.getElementById('stIgInterval').textContent = `Target: ${pq.minIgPerDay || 4}–${pq.maxIgPerDay || 7} post/akun • Jeda min. ${pq.igCooldownMins || 60} mnt`;
+            }
+            const igAccountsListEl = document.getElementById('stIgAccountsList');
+            if (igAccountsListEl) {
+              if (pq.igAccounts && pq.igAccounts.length > 0) {
+                igAccountsListEl.innerHTML = pq.igAccounts.map(i => {
+                  const statusBadge = i.count >= i.target ? `<span style="color:#d93025;font-weight:600;">Selesai</span>` : (i.isEligible ? `<span style="color:#188038;font-weight:600;">Siap</span>` : `<span style="color:#f29900;font-weight:600;">Jeda</span>`);
+                  return `<div style="display:flex;justify-content:space-between;align-items:center;background:#fff;padding:3px 6px;border-radius:4px;border:1px solid #eee;font-size:11px;">
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px;" title="${i.igId}">📸 ${i.igId}</span>
+                    <span><strong>${i.count}</strong>/${i.target} ${statusBadge}</span>
+                  </div>`;
+                }).join('');
+              } else {
+                igAccountsListEl.innerHTML = '<span style="color:#999;font-size:10px;">Belum ada IG ID diisi</span>';
+              }
+            }
+
             if (document.getElementById('stGroupCount')) {
               document.getElementById('stGroupCount').innerHTML = `${pq.countGroup || 0} <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ ${pq.targetGroup || 2} post</span>`;
             }
@@ -1393,6 +1459,10 @@
           card.innerHTML = `
             <img src="${url}" alt="photo">
             <button type="button" class="btn-remove-img" onclick="removeImageCard(this, '${gridId}', '${textareaId}')">&times;</button>
+            <label class="medsos-toggle" title="Centang jika foto ini layak diposting ke FB Page & Instagram">
+              <input type="checkbox" class="chk-medsos" checked onchange="syncGridToTextarea('${gridId}', '${textareaId}')">
+              <span>📱 Medsos</span>
+            </label>
           `;
           syncGridToTextarea(gridId, textareaId);
           showToast(`${file.name} berhasil diupload!`, 'success');
@@ -1421,11 +1491,16 @@
       const grid = document.getElementById(gridId);
       const textarea = document.getElementById(textareaId);
       if (!grid || !textarea) return;
-      const urls = [];
+      const lines = [];
       grid.querySelectorAll('.upload-card').forEach(c => {
-        if (c.dataset.url) urls.push(c.dataset.url);
+        const url = c.dataset.url;
+        const chk = c.querySelector('.chk-medsos');
+        const isMedsos = chk ? chk.checked : false;
+        if (url) {
+          lines.push(isMedsos ? `${url} | #medsos` : url);
+        }
       });
-      textarea.value = urls.join('\n');
+      textarea.value = lines.join('\n');
     }
 
     function syncTextareaToGrid(textareaId, gridId) {
@@ -1433,12 +1508,14 @@
       const grid = document.getElementById(gridId);
       if (!textarea || !grid) return;
       grid.innerHTML = '';
-      const urls = parseImageUrls(textarea.value);
-      if (urls.length === 0) {
+      const rawLines = String(textarea.value || '').split(/[\n,]/).map(l => l.trim()).filter(l => l.startsWith('http'));
+      if (rawLines.length === 0) {
         grid.innerHTML = '<div class="empty-grid-msg" style="font-size:12px;color:#999;grid-column:1/-1;text-align:center;padding:10px;">Belum ada foto. Klik tombol "Upload Foto" di atas.</div>';
         return;
       }
-      urls.forEach(url => {
+      rawLines.forEach(line => {
+        const isMedsos = line.toLowerCase().includes('#medsos') || line.toLowerCase().includes('#post') || line.toLowerCase().includes('#ig') || line.toLowerCase().includes('[medsos]');
+        const url = line.split('|')[0].trim();
         const thumb = formatDriveThumbnail(url) || url;
         const card = document.createElement('div');
         card.className = 'upload-card';
@@ -1446,6 +1523,10 @@
         card.innerHTML = `
           <img src="${thumb}" alt="photo">
           <button type="button" class="btn-remove-img" onclick="removeImageCard(this, '${gridId}', '${textareaId}')">&times;</button>
+          <label class="medsos-toggle" title="Centang jika foto ini layak diposting ke FB Page & Instagram">
+            <input type="checkbox" class="chk-medsos" ${isMedsos ? 'checked' : ''} onchange="syncGridToTextarea('${gridId}', '${textareaId}')">
+            <span>📱 Medsos</span>
+          </label>
         `;
         grid.appendChild(card);
       });
@@ -1464,7 +1545,7 @@
       }
     }
 
-    function addVarianRow(containerId, textareaId, initialUrl = '', initialKet = '') {
+    function addVarianRow(containerId, textareaId, initialUrl = '', initialKet = '', initialMedsos = false) {
       const container = document.getElementById(containerId);
       if (!container) return;
       const empty = container.querySelector('.empty-varian-msg');
@@ -1476,14 +1557,25 @@
       
       const thumbSrc = initialUrl ? (formatDriveThumbnail(initialUrl) || initialUrl) : '';
       
+      let cleanKet = initialKet;
+      let isMedsos = initialMedsos;
+      if (cleanKet && (cleanKet.toLowerCase().includes('#medsos') || cleanKet.toLowerCase().includes('#post') || cleanKet.toLowerCase().includes('#ig') || cleanKet.toLowerCase().includes('[medsos]'))) {
+        isMedsos = true;
+        cleanKet = cleanKet.replace(/#medsos|#post|#ig|\[medsos\]/gi, '').trim();
+      }
+      
       row.innerHTML = `
         <div class="varian-thumb-box" onclick="this.querySelector('input[type=file]').click()" title="Klik untuk upload foto varian">
           ${thumbSrc ? `<img src="${thumbSrc}">` : `<div class="upload-prompt"><i class="fas fa-camera"></i><br>Foto</div>`}
           <input type="file" accept="image/*" style="display:none" onchange="handleVarianUpload(this, '${containerId}', '${textareaId}')">
         </div>
         <div style="flex:1;">
-          <input type="text" class="form-control form-control-sm varian-ket-input" placeholder="Nama / Kode Varian (misal: Oak Natural 01)" value="${initialKet}" oninput="syncVarianListToTextarea('${containerId}', '${textareaId}')">
+          <input type="text" class="form-control form-control-sm varian-ket-input" placeholder="Nama / Kode Varian (misal: Oak Natural 01)" value="${cleanKet}" oninput="syncVarianListToTextarea('${containerId}', '${textareaId}')">
         </div>
+        <label class="varian-medsos-toggle" title="Centang jika foto varian ini adalah desain komposit yang layak diposting di FB & IG">
+          <input type="checkbox" class="chk-varian-medsos" ${isMedsos ? 'checked' : ''} onchange="syncVarianListToTextarea('${containerId}', '${textareaId}')">
+          <span>📱 Medsos</span>
+        </label>
         <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.varian-row-item').remove(); syncVarianListToTextarea('${containerId}', '${textareaId}')" title="Hapus varian"><i class="fas fa-trash"></i></button>
       `;
       container.appendChild(row);
@@ -1523,7 +1615,11 @@
       container.querySelectorAll('.varian-row-item').forEach(row => {
         const url = row.dataset.url || '';
         const ketInput = row.querySelector('.varian-ket-input');
-        const ket = ketInput ? ketInput.value.trim() : '';
+        const chkMedsos = row.querySelector('.chk-varian-medsos');
+        let ket = ketInput ? ketInput.value.trim() : '';
+        if (chkMedsos && chkMedsos.checked) {
+          ket = ket ? `${ket} #medsos` : '#medsos';
+        }
         if (url || ket) {
           lines.push(`${url}${ket ? ' | ' + ket : ''}`);
         }
@@ -1544,7 +1640,8 @@
       varians.forEach(v => {
         const link = typeof v === 'object' ? v.link : v;
         const ket = typeof v === 'object' ? v.ket : '';
-        addVarianRow(containerId, textareaId, link, ket);
+        const isMedsos = (typeof v === 'object' && v.isMedsos) || (ket && (ket.includes('#medsos') || ket.includes('#post') || ket.includes('#ig')));
+        addVarianRow(containerId, textareaId, link, ket, isMedsos);
       });
     }
 
@@ -1938,11 +2035,15 @@
             <h4 style="font-size:14px;color:var(--text-sec)">🖼️ Hero Images (${hero.length})</h4>
           </div>
           <div class="image-grid">
-            ${hero.map(url => `
+            ${hero.map(item => {
+              const isMedsos = String(item).toLowerCase().includes('#medsos') || String(item).toLowerCase().includes('#post') || String(item).toLowerCase().includes('#ig');
+              const url = String(item).split('|')[0].trim();
+              return `
               <div class="image-item" title="${url}">
                 <img src="${formatDriveThumbnail(url)}" alt="Hero Image" onerror="this.parentElement.style.opacity='0.3'">
+                ${isMedsos ? `<div class="name" style="background:#0d8af0;font-weight:700;">📱 Medsos</div>` : ''}
               </div>
-            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada gambar hero</span>'}
+            `}).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada gambar hero</span>'}
           </div>
         </div>
         <div style="margin-bottom:20px">
@@ -1950,12 +2051,15 @@
             <h4 style="font-size:14px;color:var(--text-sec)">🎨 Varian (${varian.length})</h4>
           </div>
           <div class="image-grid">
-            ${varian.map(v => `
-              <div class="image-item" title="${v.ket || v.link}">
-                <img src="${formatDriveThumbnail(v.link)}" alt="${v.ket || 'Varian'}" onerror="this.parentElement.style.opacity='0.3'">
-                <div class="name">${v.ket || 'Variant'}</div>
+            ${varian.map(v => {
+              const isMedsos = v.isMedsos || String(v.ket || '').toLowerCase().includes('#medsos') || String(v.ket || '').toLowerCase().includes('#post') || String(v.ket || '').toLowerCase().includes('#ig');
+              const cleanKet = String(v.ket || '').replace(/#medsos|#post|#ig|\[medsos\]/gi, '').trim();
+              return `
+              <div class="image-item" title="${cleanKet || v.link}">
+                <img src="${formatDriveThumbnail(v.link)}" alt="${cleanKet || 'Varian'}" onerror="this.parentElement.style.opacity='0.3'">
+                <div class="name" style="${isMedsos ? 'background:#0d8af0;font-weight:700;' : ''}">${isMedsos ? '📱 ' : ''}${cleanKet || 'Variant'}</div>
               </div>
-            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada varian</span>'}
+            `}).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada varian</span>'}
           </div>
         </div>
         <div>
@@ -1963,11 +2067,15 @@
             <h4 style="font-size:14px;color:var(--text-sec)">🖼️ Gallery (${gallery.length})</h4>
           </div>
           <div class="image-grid">
-            ${gallery.map(url => `
+            ${gallery.map(item => {
+              const isMedsos = String(item).toLowerCase().includes('#medsos') || String(item).toLowerCase().includes('#post') || String(item).toLowerCase().includes('#ig');
+              const url = String(item).split('|')[0].trim();
+              return `
               <div class="image-item" title="${url}">
                 <img src="${formatDriveThumbnail(url)}" alt="Gallery" onerror="this.parentElement.style.opacity='0.3'">
+                ${isMedsos ? `<div class="name" style="background:#0d8af0;font-weight:700;">📱 Medsos</div>` : ''}
               </div>
-            `).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada gallery</span>'}
+            `}).join('') || '<span style="color:#999;font-size:13px;grid-column:1/-1">Tidak ada gallery</span>'}
           </div>
         </div>
       `;
@@ -2236,12 +2344,18 @@
         if (document.getElementById('cfgPostIg')) document.getElementById('cfgPostIg').checked = String(cfg.POST_TO_INSTAGRAM) === 'true';
         if (document.getElementById('cfgPostFbGroup')) document.getElementById('cfgPostFbGroup').checked = String(cfg.POST_TO_FB_GROUP) === 'true';
         if (document.getElementById('cfgFbPageId')) document.getElementById('cfgFbPageId').value = cfg.FB_PAGE_ID || '';
-        if (document.getElementById('cfgFbPageMode')) document.getElementById('cfgFbPageMode').value = cfg.FB_PAGE_POST_MODE || 'all';
+        if (document.getElementById('cfgFbPageMode')) document.getElementById('cfgFbPageMode').value = cfg.FB_PAGE_POST_MODE || 'rotate';
         if (document.getElementById('cfgFbToken')) document.getElementById('cfgFbToken').value = cfg.FB_PAGE_ACCESS_TOKEN || '';
         if (document.getElementById('cfgIgAccountId')) document.getElementById('cfgIgAccountId').value = cfg.IG_ACCOUNT_ID || '';
         if (document.getElementById('cfgFbGroupId')) document.getElementById('cfgFbGroupId').value = cfg.FB_GROUP_ID || '';
-        if (document.getElementById('cfgMaxFbPost')) document.getElementById('cfgMaxFbPost').value = cfg.MAX_FB_POST_PER_DAY || 5;
-        if (document.getElementById('cfgMaxIgPost')) document.getElementById('cfgMaxIgPost').value = cfg.MAX_IG_POST_PER_DAY || 5;
+        
+        // Quota & Cooldown Per-Account
+        if (document.getElementById('cfgMinFbPost')) document.getElementById('cfgMinFbPost').value = cfg.MIN_FB_POST_PER_DAY || 4;
+        if (document.getElementById('cfgMaxFbPost')) document.getElementById('cfgMaxFbPost').value = cfg.MAX_FB_POST_PER_DAY || 7;
+        if (document.getElementById('cfgFbCooldown')) document.getElementById('cfgFbCooldown').value = cfg.FB_COOLDOWN_MINUTES || 60;
+        if (document.getElementById('cfgMinIgPost')) document.getElementById('cfgMinIgPost').value = cfg.MIN_IG_POST_PER_DAY || 4;
+        if (document.getElementById('cfgMaxIgPost')) document.getElementById('cfgMaxIgPost').value = cfg.MAX_IG_POST_PER_DAY || 7;
+        if (document.getElementById('cfgIgCooldown')) document.getElementById('cfgIgCooldown').value = cfg.IG_COOLDOWN_MINUTES || 60;
         if (document.getElementById('cfgMaxFbGroupPost')) document.getElementById('cfgMaxFbGroupPost').value = cfg.MAX_FB_GROUP_POST_PER_DAY || 2;
         if (document.getElementById('cfgFbGroupInterval')) document.getElementById('cfgFbGroupInterval').value = cfg.FB_GROUP_INTERVAL_DAYS || 3;
         
@@ -2307,12 +2421,16 @@
         POST_TO_INSTAGRAM: document.getElementById('cfgPostIg') ? (document.getElementById('cfgPostIg').checked ? 'true' : 'false') : 'false',
         POST_TO_FB_GROUP: document.getElementById('cfgPostFbGroup') ? (document.getElementById('cfgPostFbGroup').checked ? 'true' : 'false') : 'false',
         FB_PAGE_ID: document.getElementById('cfgFbPageId')?.value.trim() || '',
-        FB_PAGE_POST_MODE: document.getElementById('cfgFbPageMode')?.value || 'all',
+        FB_PAGE_POST_MODE: document.getElementById('cfgFbPageMode')?.value || 'rotate',
         FB_PAGE_ACCESS_TOKEN: document.getElementById('cfgFbToken')?.value.trim() || '',
         IG_ACCOUNT_ID: document.getElementById('cfgIgAccountId')?.value.trim() || '',
         FB_GROUP_ID: document.getElementById('cfgFbGroupId')?.value.trim() || '',
-        MAX_FB_POST_PER_DAY: parseInt(document.getElementById('cfgMaxFbPost')?.value) || 5,
-        MAX_IG_POST_PER_DAY: parseInt(document.getElementById('cfgMaxIgPost')?.value) || 5,
+        MIN_FB_POST_PER_DAY: parseInt(document.getElementById('cfgMinFbPost')?.value) || 4,
+        MAX_FB_POST_PER_DAY: parseInt(document.getElementById('cfgMaxFbPost')?.value) || 7,
+        FB_COOLDOWN_MINUTES: parseInt(document.getElementById('cfgFbCooldown')?.value) || 60,
+        MIN_IG_POST_PER_DAY: parseInt(document.getElementById('cfgMinIgPost')?.value) || 4,
+        MAX_IG_POST_PER_DAY: parseInt(document.getElementById('cfgMaxIgPost')?.value) || 7,
+        IG_COOLDOWN_MINUTES: parseInt(document.getElementById('cfgIgCooldown')?.value) || 60,
         MAX_FB_GROUP_POST_PER_DAY: parseInt(document.getElementById('cfgMaxFbGroupPost')?.value) || 2,
         FB_GROUP_INTERVAL_DAYS: parseInt(document.getElementById('cfgFbGroupInterval')?.value) || 3
       };
@@ -2383,8 +2501,14 @@
           </div>
 
           <div style="margin-bottom:8px;">
-            <strong>4. Akun Instagram Bisnis:</strong> 
-            ${rep.igFound ? `<span style="color:#2e7d32;font-weight:600;">✅ Terhubung: @${rep.igUsername}</span>` : (rep.connectedIgId ? `<span style="color:#ef6c00;">ℹ️ Ditemukan ID IG dari Halaman (${rep.connectedIgId}). Salin ID ini ke kolom IG Account ID.</span>` : `<span style="color:#666;">ℹ️ ${rep.igError || 'Belum diisi / belum terhubung'}</span>`)}
+            <strong>4. Akun Instagram Bisnis:</strong><br>
+            ${rep.igAccountsStatus && rep.igAccountsStatus.length > 0 ? 
+              rep.igAccountsStatus.map(i => i.status === 'OK' ? 
+                `<div style="color:#2e7d32;margin-left:8px;">✅ <strong>@${i.username}</strong> (ID: ${i.id})</div>` : 
+                `<div style="color:#c62828;margin-left:8px;">❌ (ID: ${i.id}) - ${i.error}</div>`
+              ).join('') : 
+              (rep.igFound ? `<span style="color:#2e7d32;font-weight:600;">✅ Terhubung: @${rep.igUsername}</span>` : (rep.connectedIgId ? `<span style="color:#ef6c00;">ℹ️ Ditemukan ID IG dari Halaman (${rep.connectedIgId}). Salin ID ini ke kolom IG Account ID.</span>` : `<span style="color:#666;">ℹ️ ${rep.igError || 'Belum diisi / belum terhubung'}</span>`))
+            }
           </div>
         `;
         
