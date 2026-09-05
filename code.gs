@@ -122,8 +122,8 @@ function doPost(e) {
       case 'testInstagram': result = testInstagramPost(); break;
       case 'testFacebookGroup': result = testFacebookGroupPost(); break;
       case 'diagnosaMeta': result = diagnosaMetaToken(); break;
-      case 'testGoogleBisnis': result = testGoogleBisnisPost(); break;
-      case 'diagnosaGoogleBisnis': result = diagnosaGoogleBisnis(); break;
+      case 'testGoogleBisnis': result = testGoogleBisnisPost(data); break;
+      case 'diagnosaGoogleBisnis': result = diagnosaGoogleBisnis(data); break;
       case 'uploadImage': result = uploadImage(data.name, data.type, data.base64, data.folderId); break;
       default: result = { success: false, error: 'Aksi tidak dikenali: ' + action }; break;
     }
@@ -3315,47 +3315,60 @@ function postKeGoogleBisnis(summary, imageUrl, linkUrl, customTitle) {
   }
 }
 
-function testGoogleBisnisPost() {
+function testGoogleBisnisPost(data) {
   const config = getConfig();
+  data = data || {};
+  if (data.mode) config.GMB_POST_MODE = data.mode;
+  if (data.locationId) config.GMB_LOCATION_ID = data.locationId;
+  if (data.webhookUrl) config.GMB_WEBHOOK_URL = data.webhookUrl;
+  if (data.accountId) config.GMB_ACCOUNT_ID = data.accountId;
+  if (data.token) config.GMB_ACCESS_TOKEN = data.token;
+  if (data.actionType) config.GMB_ACTION_TYPE = data.actionType;
+
   const testSummary = `🚀 [TEST AUTOPOSTING]\n${config.COMPANY_NAME || 'CV Nafindo Group'} - Distributor Vinyl Lantai Resmi.\n\nSistem integrasi Google Maps Bisnis berhasil terhubung dengan sukses!\n\n📲 Info WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
   const testImg = 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800';
   const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
   return postKeGoogleBisnis(testSummary, testImg, `https://wa.me/${cleanWa}`, 'Test Post Google Bisnis');
 }
 
-function diagnosaGoogleBisnis() {
+function diagnosaGoogleBisnis(data) {
   const config = getConfig();
+  data = data || {};
+  const mode = String(data.mode || config.GMB_POST_MODE || 'direct').toLowerCase();
+  const locationId = String(data.locationId || config.GMB_LOCATION_ID || '').trim();
+  const accountId = String(data.accountId || config.GMB_ACCOUNT_ID || '').trim();
+  const webhookUrl = String(data.webhookUrl || config.GMB_WEBHOOK_URL || '').trim();
+  const customToken = String(data.token || config.GMB_ACCESS_TOKEN || '').trim();
+
   const res = {
     isConfigured: false,
-    mode: config.GMB_POST_MODE || 'direct',
+    mode: mode,
     tokenStatus: 'Belum dicek',
     accountsFound: [],
     webhookStatus: 'N/A',
     advice: []
   };
 
-  const mode = String(config.GMB_POST_MODE || 'direct').toLowerCase();
-
   if (mode === 'webhook') {
-    if (!config.GMB_WEBHOOK_URL) {
-      res.advice.push('URL Webhook masih kosong. Buat skenario Webhook di Make.com / Zapier / n8n lalu tempelkan URL webhook ke Pengaturan.');
+    if (!webhookUrl) {
+      res.advice.push('URL Webhook masih kosong di form atau belum disimpan. Buat skenario Webhook di Make.com lalu tempelkan URL-nya.');
     } else {
       res.isConfigured = true;
-      res.webhookStatus = 'URL Webhook aktif: ' + config.GMB_WEBHOOK_URL.substring(0, 50) + '...';
+      res.webhookStatus = 'URL Webhook aktif: ' + webhookUrl.substring(0, 50) + '...';
       res.advice.push('Mode Webhook siap digunakan! Klik tombol "Test Post Google Maps Bisnis" untuk mengirim uji coba.');
     }
     return { success: true, data: res };
   }
 
   // Direct Mode Diagnosa
-  if (!config.GMB_LOCATION_ID) {
-    res.advice.push('Location / Profile ID Google Maps Bisnis belum diisi.');
+  if (!locationId) {
+    res.advice.push('Location / Profile ID Google Maps Bisnis belum diisi di kolom input atau belum disimpan.');
   } else {
     res.isConfigured = true;
-    res.locationId = config.GMB_LOCATION_ID;
+    res.locationId = locationId;
   }
 
-  let token = config.GMB_ACCESS_TOKEN;
+  let token = customToken;
   if (!token) {
     try {
       token = ScriptApp.getOAuthToken();
@@ -3383,7 +3396,7 @@ function diagnosaGoogleBisnis() {
           res.advice.push('Berhasil terhubung dengan Akun Google Business Profile!');
         }
       } else if (code === 403 || code === 429) {
-        res.advice.push(`Google API mengembalikan status ${code}. Jika proyek Google Cloud Anda belum memiliki API Approval, beralihlah ke Mode Webhook (Make.com/Zapier/n8n) untuk posting instan tanpa persetujuan Google Cloud.`);
+        res.advice.push(`Google API mengembalikan status ${code} (Izin Akses Ditolak). Akun Google Cloud ini belum memiliki API Approval resmi dari Google untuk memanggil Google Business Profile API secara langsung. Silakan gunakan Mode Webhook Bridge (Make.com) untuk posting instan tanpa persetujuan Google Cloud.`);
       }
     } catch(e) {
       res.advice.push('Cek akun error: ' + e.toString());

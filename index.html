@@ -2747,7 +2747,13 @@
         box.innerHTML = '<div style="color:var(--primary);"><i class="fas fa-spinner fa-spin"></i> Sedang memeriksa koneksi Google Maps Bisnis...</div>';
       }
       try {
-        const res = await apiPost('diagnosaGoogleBisnis', {});
+        const locationId = document.getElementById('cfgGmbLocationId')?.value.trim() || '';
+        const accountId = document.getElementById('cfgGmbAccountId')?.value.trim() || '';
+        const token = document.getElementById('cfgGmbToken')?.value.trim() || '';
+        const webhookUrl = document.getElementById('cfgGmbWebhookUrl')?.value.trim() || '';
+        const mode = document.getElementById('gmbModeWebhook')?.checked ? 'webhook' : 'direct';
+
+        const res = await apiPost('diagnosaGoogleBisnis', { locationId, accountId, token, webhookUrl, mode });
         if (!res.success) {
           if (box) box.innerHTML = `<div style="color:#d32f2f;">Gagal diagnosa: ${res.error || 'Terjadi kesalahan'}</div>`;
           return;
@@ -2763,7 +2769,7 @@
         if (d.mode === 'webhook') {
           html += `<div style="margin-bottom:6px;"><strong>Status Webhook:</strong> <span style="color:#2e7d32;font-weight:600;">${d.webhookStatus}</span></div>`;
         } else {
-          html += `<div style="margin-bottom:6px;"><strong>Location / Profile ID:</strong> ${d.locationId ? `<span style="color:#2e7d32;font-weight:600;">✅ ${d.locationId}</span>` : '<span style="color:#d32f2f">Belum diisi</span>'}</div>`;
+          html += `<div style="margin-bottom:6px;"><strong>Location / Profile ID:</strong> ${d.locationId ? `<span style="color:#2e7d32;font-weight:600;">✅ ${d.locationId}</span>` : '<span style="color:#d32f2f">Belum diisi / belum disimpan</span>'}</div>`;
           html += `<div style="margin-bottom:6px;"><strong>Status Token:</strong> <span style="color:#2e7d32;font-weight:600;">${d.tokenStatus}</span></div>`;
           if (d.accountsFound && d.accountsFound.length > 0) {
             html += `<div style="margin-bottom:6px;"><strong>Akun Bisnis Ditemukan:</strong><br>${d.accountsFound.map(a => `• ${a.accountName || a.name} (<code>${a.name}</code>)`).join('<br>')}</div>`;
@@ -2781,7 +2787,14 @@
     async function testPostGoogleBisnis() {
       showToast('Mengirim test postingan ke Google Maps Bisnis...', 'info');
       try {
-        const res = await apiPost('testGoogleBisnis', {});
+        const locationId = document.getElementById('cfgGmbLocationId')?.value.trim() || '';
+        const accountId = document.getElementById('cfgGmbAccountId')?.value.trim() || '';
+        const token = document.getElementById('cfgGmbToken')?.value.trim() || '';
+        const webhookUrl = document.getElementById('cfgGmbWebhookUrl')?.value.trim() || '';
+        const mode = document.getElementById('gmbModeWebhook')?.checked ? 'webhook' : 'direct';
+        const actionType = document.getElementById('cfgGmbActionType')?.value || 'LEARN_MORE';
+
+        const res = await apiPost('testGoogleBisnis', { locationId, accountId, token, webhookUrl, mode, actionType });
         if (res.success) {
           showToast('✅ Berhasil posting ke Google Maps Bisnis!', 'success');
           if (res.url) window.open(res.url, '_blank');
