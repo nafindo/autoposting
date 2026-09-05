@@ -197,6 +197,16 @@
                 <div style="font-size:18px;font-weight:700;" id="stGroupCount">0 <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ 0 post</span></div>
                 <div style="font-size:11px;color:var(--text-sec);margin-top:2px;" id="stGroupTarget">Memuat status rolling...</div>
               </div>
+
+              <!-- Google Maps Bisnis Status -->
+              <div style="background:#f8f9fa;padding:12px 14px;border-radius:8px;border:1px solid #e0e0e0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                  <span style="font-weight:600;font-size:12px;display:flex;align-items:center;gap:6px;"><i class="fas fa-map-marked-alt" style="color:#34a853"></i> Google Maps Bisnis</span>
+                  <span id="stGmbBadge" class="badge badge-success" style="font-size:10px;">Siap</span>
+                </div>
+                <div style="font-size:18px;font-weight:700;" id="stGmbCount">0 <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ 0 post</span></div>
+                <div style="font-size:11px;color:var(--text-sec);margin-top:2px;" id="stGmbTarget">Target per Hari • Jeda aman 2 jam</div>
+              </div>
             </div>
           </div>
         </div>
@@ -540,6 +550,10 @@
                 <input type="checkbox" id="cfgPostIg" style="width:18px;height:18px;cursor:pointer;">
                 <i class="fab fa-instagram" style="color:#e4405f;font-size:18px;"></i> Instagram Bisnis
               </label>
+              <label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;user-select:none;">
+                <input type="checkbox" id="cfgPostGmb" style="width:18px;height:18px;cursor:pointer;">
+                <i class="fas fa-map-marked-alt" style="color:#34a853;font-size:18px;"></i> Google Maps Bisnis
+              </label>
             </div>
 
             <!-- Meta Configuration Form -->
@@ -672,6 +686,103 @@
             <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
               <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostFacebookGroup()"><i class="fas fa-users"></i> Test Post FB Group (Grup Giliran Berikutnya)</button>
             </div>
+          </div>
+        </div>
+
+        <!-- PENGATURAN 3: GOOGLE MAPS BISNIS (GOOGLE BUSINESS PROFILE) -->
+        <div class="card" style="border-left:4px solid #34a853;">
+          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+            <h3>📍 Pengaturan Google Maps Bisnis (Google Business Profile)</h3>
+            <span class="badge" style="background:#e6f4ea;color:#137333;font-size:11px;">Local Posts & Maps SEO</span>
+          </div>
+          <div class="card-body">
+            <p style="font-size:12px;color:var(--text-sec);margin-bottom:14px;">
+              Publikasikan pembaruan produk, promo, dan katalog langsung ke profil <strong>Google Maps Bisnis (CV. NAFINDO GROUP)</strong> untuk meningkatkan visibilitas di Google Search & Maps.
+            </p>
+
+            <!-- Mode Pemilihan Integrasi -->
+            <div style="background:#f8f9fa;padding:12px 16px;border-radius:8px;border:1px solid #e0e0e0;margin-bottom:16px;">
+              <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--text);display:flex;align-items:center;gap:6px;">
+                <i class="fas fa-plug" style="color:#34a853;"></i> Jalur Koneksi Google Maps Bisnis
+              </div>
+              <div style="display:flex;gap:20px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+                  <input type="radio" name="cfgGmbModeRadio" value="direct" id="gmbModeDirect" checked onchange="toggleGmbModeUI()">
+                  <strong>Mode Direct API</strong> (Google Cloud API / OAuth)
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+                  <input type="radio" name="cfgGmbModeRadio" value="webhook" id="gmbModeWebhook" onchange="toggleGmbModeUI()">
+                  <strong>Mode Webhook Bridge</strong> (Make.com / Zapier / n8n - <em>Instan Tanpa Approval</em>)
+                </label>
+              </div>
+            </div>
+
+            <!-- Bagian 1: Form Direct API -->
+            <div id="gmbDirectFields">
+              <div class="form-row">
+                <div class="form-group">
+                  <label><i class="fas fa-map-pin" style="color:#34a853;"></i> ID Profil Bisnis / Location ID <span style="color:var(--danger)">*</span></label>
+                  <input type="text" class="form-control" id="cfgGmbLocationId" placeholder="Contoh: 1083928172938491029">
+                  <small style="color:#888">Buka profil bisnis di Google Search &gt; klik menu titik tiga (⋮) &gt; Setelan Profil Bisnis &gt; Setelan Lanjutan &gt; salin <strong>ID Profil Bisnis</strong> (19 digit).</small>
+                </div>
+                <div class="form-group">
+                  <label><i class="fas fa-user-shield" style="color:#34a853;"></i> ID Akun Bisnis Google (Account ID) <small style="font-weight:normal;color:#888">(Opsional / Otomatis)</small></label>
+                  <input type="text" class="form-control" id="cfgGmbAccountId" placeholder="Kosongkan jika ingin auto-detect dari Google OAuth">
+                  <small style="color:#888">Diisi jika Anda mengelola bisnis lewat Google Business Profile Manager multi-lokasi.</small>
+                </div>
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-key" style="color:#34a853;"></i> Custom Access Token Google <small style="font-weight:normal;color:#888">(Opsional / Default: Google OAuth Apps Script)</small></label>
+                <input type="password" class="form-control" id="cfgGmbToken" placeholder="Kosongkan untuk memakai izin login akun Google Apps Script saat ini">
+                <small style="color:#888">Hanya diisi jika Anda menggunakan token OAuth eksternal dari Service Account / GCP.</small>
+              </div>
+            </div>
+
+            <!-- Bagian 2: Form Webhook -->
+            <div id="gmbWebhookFields" style="display:none;">
+              <div class="form-group">
+                <label><i class="fas fa-link" style="color:#34a853;"></i> Webhook URL (Make.com / Zapier / n8n / Pabbly) <span style="color:var(--danger)">*</span></label>
+                <input type="text" class="form-control" id="cfgGmbWebhookUrl" placeholder="https://hook.eu1.make.com/... atau https://hooks.zapier.com/...">
+                <small style="color:#888">Buat skenario Webhook di Make.com / Zapier lalu hubungkan modul <strong>Google Business Profile &gt; Create a Post</strong>. Cara ini 100% langsung jalan tanpa izin khusus GCP!</small>
+              </div>
+            </div>
+
+            <!-- Pengaturan Tombol & Kuota -->
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fas fa-mouse-pointer" style="color:#34a853;"></i> Tombol Aksi (Call To Action / CTA)</label>
+                <select class="form-control" id="cfgGmbActionType">
+                  <option value="LEARN_MORE" selected>🔍 Pelajari Lebih Lanjut (Link Artikel / Katalog)</option>
+                  <option value="ORDER">🛒 Pesan Sekarang (WhatsApp Langsung)</option>
+                  <option value="CALL">📞 Hubungi Kami (Telepon WhatsApp)</option>
+                  <option value="BOOK">📅 Booking / Janji Temu</option>
+                </select>
+                <small style="color:#888">Tombol yang muncul di bagian bawah postingan Google Maps Bisnis.</small>
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-clock" style="color:#34a853;"></i> Jeda Cooldown Antar-Post (Menit)</label>
+                <input type="number" class="form-control" id="cfgGmbCooldown" min="30" max="720" value="120">
+                <small style="color:#888">Jarak minimal antar-postingan ke Google Maps agar tidak dianggap spam (rekomendasi: 120 menit / 2 jam).</small>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fas fa-chart-line" style="color:#34a853;"></i> Min Post Google Bisnis / Hari</label>
+                <input type="number" class="form-control" id="cfgMinGmbPost" min="1" max="10" value="2">
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-chart-line" style="color:#34a853;"></i> Max Post Google Bisnis / Hari</label>
+                <input type="number" class="form-control" id="cfgMaxGmbPost" min="1" max="10" value="4">
+              </div>
+            </div>
+
+            <!-- Testing Buttons GMB -->
+            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center;">
+              <button type="button" class="btn btn-outline" style="font-size:12px;color:#137333;border-color:#34a853;" onclick="diagnosaGmbAPI()"><i class="fas fa-stethoscope"></i> 🔍 Cek Koneksi Google Bisnis</button>
+              <button type="button" class="btn btn-outline" style="font-size:12px;" onclick="testPostGoogleBisnis()"><i class="fas fa-map-marked-alt"></i> Test Post Google Maps Bisnis</button>
+            </div>
+            <div id="gmbDiagnosticBox" style="display:none;margin-top:14px;background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:14px;font-size:12px;line-height:1.6;"></div>
           </div>
         </div>
       </div>
@@ -1118,6 +1229,43 @@
                 }
               } else {
                 document.getElementById('stGroupTarget').textContent = `Interval ${pq.groupIntervalDays || 3} hari per grup`;
+              }
+            }
+
+            // Google Maps Bisnis Dashboard Widget
+            if (document.getElementById('stGmbCount')) {
+              document.getElementById('stGmbCount').innerHTML = `${pq.countGmb || 0} <span style="font-size:12px;font-weight:400;color:var(--text-sec)">/ ${pq.targetGmb || 3} post</span>`;
+            }
+            if (document.getElementById('stGmbTarget')) {
+              if (pq.isGmbConfigured) {
+                if (pq.isGmbEligible) {
+                  document.getElementById('stGmbTarget').innerHTML = `<span style="color:#188038;font-weight:600;">🟢 Siap posting</span> (Target: ${pq.minGmbPerDay || 2}–${pq.maxGmbPerDay || 4}/hari)`;
+                  if (document.getElementById('stGmbBadge')) {
+                    document.getElementById('stGmbBadge').className = 'badge badge-success';
+                    document.getElementById('stGmbBadge').textContent = 'Siap';
+                  }
+                } else if (pq.countGmb >= pq.targetGmb) {
+                  document.getElementById('stGmbTarget').innerHTML = `<span style="color:#d93025;font-weight:600;">Target Kuota Hari Ini Tercapai</span>`;
+                  if (document.getElementById('stGmbBadge')) {
+                    document.getElementById('stGmbBadge').className = 'badge';
+                    document.getElementById('stGmbBadge').style.background = '#fad2cf';
+                    document.getElementById('stGmbBadge').style.color = '#d93025';
+                    document.getElementById('stGmbBadge').textContent = 'Selesai';
+                  }
+                } else {
+                  const sisaMnt = Math.max(1, Math.round((pq.gmbCooldownMins || 120) - (pq.diffMinsGmb || 0)));
+                  document.getElementById('stGmbTarget').innerHTML = `<span style="color:#f29900;font-weight:600;">⏳ Cooldown</span> (${sisaMnt} mnt lagi)`;
+                  if (document.getElementById('stGmbBadge')) {
+                    document.getElementById('stGmbBadge').className = 'badge badge-warning';
+                    document.getElementById('stGmbBadge').textContent = 'Jeda';
+                  }
+                }
+              } else {
+                document.getElementById('stGmbTarget').innerHTML = `<span style="color:#888;">Belum diatur di Pengaturan</span>`;
+                if (document.getElementById('stGmbBadge')) {
+                  document.getElementById('stGmbBadge').className = 'badge';
+                  document.getElementById('stGmbBadge').textContent = 'Nonaktif';
+                }
               }
             }
           }
@@ -2343,11 +2491,29 @@
         if (document.getElementById('cfgPostFb')) document.getElementById('cfgPostFb').checked = String(cfg.POST_TO_FACEBOOK) === 'true';
         if (document.getElementById('cfgPostIg')) document.getElementById('cfgPostIg').checked = String(cfg.POST_TO_INSTAGRAM) === 'true';
         if (document.getElementById('cfgPostFbGroup')) document.getElementById('cfgPostFbGroup').checked = String(cfg.POST_TO_FB_GROUP) === 'true';
+        if (document.getElementById('cfgPostGmb')) document.getElementById('cfgPostGmb').checked = String(cfg.POST_TO_GMB) === 'true';
         if (document.getElementById('cfgFbPageId')) document.getElementById('cfgFbPageId').value = cfg.FB_PAGE_ID || '';
         if (document.getElementById('cfgFbPageMode')) document.getElementById('cfgFbPageMode').value = cfg.FB_PAGE_POST_MODE || 'rotate';
         if (document.getElementById('cfgFbToken')) document.getElementById('cfgFbToken').value = cfg.FB_PAGE_ACCESS_TOKEN || '';
         if (document.getElementById('cfgIgAccountId')) document.getElementById('cfgIgAccountId').value = cfg.IG_ACCOUNT_ID || '';
         if (document.getElementById('cfgFbGroupId')) document.getElementById('cfgFbGroupId').value = cfg.FB_GROUP_ID || '';
+        
+        // Google Maps Bisnis Config
+        const gmbMode = (cfg.GMB_POST_MODE || 'direct').toLowerCase();
+        if (gmbMode === 'webhook') {
+          if (document.getElementById('gmbModeWebhook')) document.getElementById('gmbModeWebhook').checked = true;
+        } else {
+          if (document.getElementById('gmbModeDirect')) document.getElementById('gmbModeDirect').checked = true;
+        }
+        if (document.getElementById('cfgGmbLocationId')) document.getElementById('cfgGmbLocationId').value = cfg.GMB_LOCATION_ID || '';
+        if (document.getElementById('cfgGmbAccountId')) document.getElementById('cfgGmbAccountId').value = cfg.GMB_ACCOUNT_ID || '';
+        if (document.getElementById('cfgGmbToken')) document.getElementById('cfgGmbToken').value = cfg.GMB_ACCESS_TOKEN || '';
+        if (document.getElementById('cfgGmbWebhookUrl')) document.getElementById('cfgGmbWebhookUrl').value = cfg.GMB_WEBHOOK_URL || '';
+        if (document.getElementById('cfgGmbActionType')) document.getElementById('cfgGmbActionType').value = cfg.GMB_ACTION_TYPE || 'LEARN_MORE';
+        if (document.getElementById('cfgGmbCooldown')) document.getElementById('cfgGmbCooldown').value = cfg.GMB_COOLDOWN_MINUTES || 120;
+        if (document.getElementById('cfgMinGmbPost')) document.getElementById('cfgMinGmbPost').value = cfg.MIN_GMB_POST_PER_DAY || 2;
+        if (document.getElementById('cfgMaxGmbPost')) document.getElementById('cfgMaxGmbPost').value = cfg.MAX_GMB_POST_PER_DAY || 4;
+        toggleGmbModeUI();
         
         // Quota & Cooldown Per-Account
         if (document.getElementById('cfgMinFbPost')) document.getElementById('cfgMinFbPost').value = cfg.MIN_FB_POST_PER_DAY || 4;
@@ -2430,9 +2596,18 @@
         FB_COOLDOWN_MINUTES: parseInt(document.getElementById('cfgFbCooldown')?.value) || 60,
         MIN_IG_POST_PER_DAY: parseInt(document.getElementById('cfgMinIgPost')?.value) || 4,
         MAX_IG_POST_PER_DAY: parseInt(document.getElementById('cfgMaxIgPost')?.value) || 7,
-        IG_COOLDOWN_MINUTES: parseInt(document.getElementById('cfgIgCooldown')?.value) || 60,
         MAX_FB_GROUP_POST_PER_DAY: parseInt(document.getElementById('cfgMaxFbGroupPost')?.value) || 2,
-        FB_GROUP_INTERVAL_DAYS: parseInt(document.getElementById('cfgFbGroupInterval')?.value) || 3
+        FB_GROUP_INTERVAL_DAYS: parseInt(document.getElementById('cfgFbGroupInterval')?.value) || 3,
+        POST_TO_GMB: document.getElementById('cfgPostGmb') ? (document.getElementById('cfgPostGmb').checked ? 'true' : 'false') : 'false',
+        GMB_POST_MODE: document.getElementById('gmbModeWebhook')?.checked ? 'webhook' : 'direct',
+        GMB_LOCATION_ID: document.getElementById('cfgGmbLocationId')?.value.trim() || '',
+        GMB_ACCOUNT_ID: document.getElementById('cfgGmbAccountId')?.value.trim() || '',
+        GMB_ACCESS_TOKEN: document.getElementById('cfgGmbToken')?.value.trim() || '',
+        GMB_WEBHOOK_URL: document.getElementById('cfgGmbWebhookUrl')?.value.trim() || '',
+        GMB_ACTION_TYPE: document.getElementById('cfgGmbActionType')?.value || 'LEARN_MORE',
+        GMB_COOLDOWN_MINUTES: parseInt(document.getElementById('cfgGmbCooldown')?.value) || 120,
+        MIN_GMB_POST_PER_DAY: parseInt(document.getElementById('cfgMinGmbPost')?.value) || 2,
+        MAX_GMB_POST_PER_DAY: parseInt(document.getElementById('cfgMaxGmbPost')?.value) || 4
       };
       
       try {
@@ -2552,6 +2727,66 @@
           showToast('✅ Berhasil posting ke Facebook Group (' + (res.groupId || '') + ')!', 'success');
         } else {
           showToast('❌ Gagal: ' + (res.error || 'Periksa FB Group ID & Token'), 'error');
+        }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    // ==================== GOOGLE MAPS BISNIS HELPERS ====================
+    function toggleGmbModeUI() {
+      const isWebhook = document.getElementById('gmbModeWebhook')?.checked;
+      const directEl = document.getElementById('gmbDirectFields');
+      const webhookEl = document.getElementById('gmbWebhookFields');
+      if (directEl) directEl.style.display = isWebhook ? 'none' : 'block';
+      if (webhookEl) webhookEl.style.display = isWebhook ? 'block' : 'none';
+    }
+
+    async function diagnosaGmbAPI() {
+      const box = document.getElementById('gmbDiagnosticBox');
+      if (box) {
+        box.style.display = 'block';
+        box.innerHTML = '<div style="color:var(--primary);"><i class="fas fa-spinner fa-spin"></i> Sedang memeriksa koneksi Google Maps Bisnis...</div>';
+      }
+      try {
+        const res = await apiPost('diagnosaGoogleBisnis', {});
+        if (!res.success) {
+          if (box) box.innerHTML = `<div style="color:#d32f2f;">Gagal diagnosa: ${res.error || 'Terjadi kesalahan'}</div>`;
+          return;
+        }
+        const d = res.data;
+        let html = `
+          <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e0e0e0;padding-bottom:8px;margin-bottom:10px;">
+            <strong style="font-size:13px;color:#137333;"><i class="fas fa-map-marked-alt"></i> Hasil Diagnosa Google Maps Bisnis</strong>
+            <button class="btn btn-outline btn-sm" style="font-size:10px;padding:2px 8px;" onclick="document.getElementById('gmbDiagnosticBox').style.display='none'">Tutup</button>
+          </div>
+          <div style="margin-bottom:6px;"><strong>Jalur Koneksi:</strong> ${d.mode === 'webhook' ? '🌐 Webhook Bridge (Make / Zapier)' : '🔌 Direct Google API'}</div>
+        `;
+        if (d.mode === 'webhook') {
+          html += `<div style="margin-bottom:6px;"><strong>Status Webhook:</strong> <span style="color:#2e7d32;font-weight:600;">${d.webhookStatus}</span></div>`;
+        } else {
+          html += `<div style="margin-bottom:6px;"><strong>Location / Profile ID:</strong> ${d.locationId ? `<span style="color:#2e7d32;font-weight:600;">✅ ${d.locationId}</span>` : '<span style="color:#d32f2f">Belum diisi</span>'}</div>`;
+          html += `<div style="margin-bottom:6px;"><strong>Status Token:</strong> <span style="color:#2e7d32;font-weight:600;">${d.tokenStatus}</span></div>`;
+          if (d.accountsFound && d.accountsFound.length > 0) {
+            html += `<div style="margin-bottom:6px;"><strong>Akun Bisnis Ditemukan:</strong><br>${d.accountsFound.map(a => `• ${a.accountName || a.name} (<code>${a.name}</code>)`).join('<br>')}</div>`;
+          }
+        }
+        if (d.advice && d.advice.length > 0) {
+          html += `<div style="margin-top:8px;padding:8px 12px;background:#e8f4fd;border-radius:4px;font-size:11px;color:#0d47a1;line-height:1.5;"><strong>💡 Catatan & Panduan:</strong><ul style="margin:4px 0 0 16px;padding:0;">${d.advice.map(adv => `<li>${adv}</li>`).join('')}</ul></div>`;
+        }
+        if (box) box.innerHTML = html;
+      } catch(e) {
+        if (box) box.innerHTML = `<div style="color:#d32f2f;">Error diagnosa: ${e.message}</div>`;
+      }
+    }
+
+    async function testPostGoogleBisnis() {
+      showToast('Mengirim test postingan ke Google Maps Bisnis...', 'info');
+      try {
+        const res = await apiPost('testGoogleBisnis', {});
+        if (res.success) {
+          showToast('✅ Berhasil posting ke Google Maps Bisnis!', 'success');
+          if (res.url) window.open(res.url, '_blank');
+        } else {
+          showToast('❌ Gagal: ' + (res.error || 'Periksa pengaturan Google Bisnis'), 'error');
         }
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }

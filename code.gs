@@ -39,7 +39,17 @@ const DEFAULT_CONFIG = {
   MAX_FB_GROUP_POST_PER_DAY: 2,
   FB_GROUP_INTERVAL_DAYS: 3,
   FB_COOLDOWN_MINUTES: 60,
-  IG_COOLDOWN_MINUTES: 60
+  IG_COOLDOWN_MINUTES: 60,
+  POST_TO_GMB: 'false',
+  GMB_POST_MODE: 'direct',
+  GMB_ACCOUNT_ID: '',
+  GMB_LOCATION_ID: '',
+  GMB_ACCESS_TOKEN: '',
+  GMB_WEBHOOK_URL: '',
+  GMB_ACTION_TYPE: 'LEARN_MORE',
+  MIN_GMB_POST_PER_DAY: 2,
+  MAX_GMB_POST_PER_DAY: 4,
+  GMB_COOLDOWN_MINUTES: 120
 };
 
 // ==================== WEB APP ====================
@@ -112,6 +122,8 @@ function doPost(e) {
       case 'testInstagram': result = testInstagramPost(); break;
       case 'testFacebookGroup': result = testFacebookGroupPost(); break;
       case 'diagnosaMeta': result = diagnosaMetaToken(); break;
+      case 'testGoogleBisnis': result = testGoogleBisnisPost(); break;
+      case 'diagnosaGoogleBisnis': result = diagnosaGoogleBisnis(); break;
       case 'uploadImage': result = uploadImage(data.name, data.type, data.base64, data.folderId); break;
       default: result = { success: false, error: 'Aksi tidak dikenali: ' + action }; break;
     }
@@ -158,7 +170,8 @@ function getConfig() {
     'MIN_POST_PER_DAY', 'MAX_POST_PER_DAY', 'JAM_AKTIF_MULAI', 'JAM_AKTIF_SELESAI',
     'TRIGGER_INTERVAL_MINUTES', 'KEYWORD_REFRESH_HOUR', 'MIN_DELAY_MINUTES', 'MAX_DELAY_MINUTES',
     'POSTS_PER_BATCH', 'MIN_FB_POST_PER_DAY', 'MAX_FB_POST_PER_DAY', 'MIN_IG_POST_PER_DAY', 'MAX_IG_POST_PER_DAY',
-    'MAX_FB_GROUP_POST_PER_DAY', 'FB_GROUP_INTERVAL_DAYS', 'FB_COOLDOWN_MINUTES', 'IG_COOLDOWN_MINUTES'
+    'MAX_FB_GROUP_POST_PER_DAY', 'FB_GROUP_INTERVAL_DAYS', 'FB_COOLDOWN_MINUTES', 'IG_COOLDOWN_MINUTES',
+    'MIN_GMB_POST_PER_DAY', 'MAX_GMB_POST_PER_DAY', 'GMB_COOLDOWN_MINUTES'
   ];
 
   for (let i = 1; i < data.length; i++) {
@@ -222,7 +235,7 @@ function saveConfig(configObj) {
   sheet.appendRow(['Key', 'Value']);
   Object.entries(configObj).forEach(([k, v]) => {
     // Tulis sebagai plain text jika ID atau nomor WA
-    if (k === 'BLOG_ID' || k === 'WHATSAPP_NUMBER' || k === 'SPREADSHEET_ID' || k === 'FB_PAGE_ID' || k === 'IG_ACCOUNT_ID' || k === 'FB_GROUP_ID') {
+    if (k === 'BLOG_ID' || k === 'WHATSAPP_NUMBER' || k === 'SPREADSHEET_ID' || k === 'FB_PAGE_ID' || k === 'IG_ACCOUNT_ID' || k === 'FB_GROUP_ID' || k === 'GMB_ACCOUNT_ID' || k === 'GMB_LOCATION_ID') {
       sheet.appendRow([k, "'" + String(v).replace(/^'+/, '')]);
     } else {
       sheet.appendRow([k, v]);
@@ -1575,6 +1588,23 @@ function buatPostinganOtomatis() {
             console.warn('⚠️ FB Group Exception: ' + eGrp);
           }
         }
+
+        // 5. Post ke Google Maps Bisnis (Google Business Profile)
+        if (String(config.POST_TO_GMB) === 'true' && (config.GMB_WEBHOOK_URL || config.GMB_LOCATION_ID) && quotaStatus.canPostGmb) {
+          try {
+            const gmbSummary = (aiData.socialCaption || finalTitle) + `\n\nInfo Pemesanan & Konsultasi:\n📲 WhatsApp: 0${cleanWa.replace(/^62/, '')}`;
+            const gmbActionUrl = resBlogger.url || `https://wa.me/${cleanWa}`;
+            const resGmb = postKeGoogleBisnis(gmbSummary, socialImgUrl || heroThumb || heroLink, gmbActionUrl, finalTitle);
+            if (resGmb && resGmb.success) {
+              channelLogs.push('Google Bisnis');
+              console.log(`✅ Berhasil post ke Google Maps Bisnis (${resGmb.count || ''}/${resGmb.target || ''} hari ini)`);
+            } else {
+              console.warn('⚠️ Gagal post ke Google Maps Bisnis: ' + (resGmb.error || ''));
+            }
+          } catch(eGmb) {
+            console.warn('⚠️ GMB Exception: ' + eGmb);
+          }
+        }
         
         const channelStr = channelLogs.length > 0 ? ` [${channelLogs.join(', ')}]` : '';
         const retryTag = attempt > 1 ? ` (Sukses setelah ${attempt}x coba)` : '';
@@ -1717,6 +1747,19 @@ function postManual(produkNama, keyword, row) {
             channelLogs.push(grpTag);
           }
         } catch(eGrp) {}
+      }
+
+      // 5. Post ke Google Maps Bisnis (ISOLATED)
+      if (String(config.POST_TO_GMB) === 'true' && (config.GMB_WEBHOOK_URL || config.GMB_LOCATION_ID)) {
+        try {
+          const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
+          const gmbSummary = (aiData.socialCaption || finalTitle) + `\n\nInfo Pemesanan & Konsultasi:\n📲 WhatsApp: 0${cleanWa.replace(/^62/, '')}`;
+          const gmbActionUrl = resBlogger.url || `https://wa.me/${cleanWa}`;
+          const resGmb = postKeGoogleBisnis(gmbSummary, socialImgUrl || heroThumb || heroLink, gmbActionUrl, finalTitle);
+          if (resGmb && resGmb.success) {
+            channelLogs.push('Google Bisnis');
+          }
+        } catch(eGmb) {}
       }
       
       const channelStr = channelLogs.length > 0 ? ` [${channelLogs.join(', ')}]` : '';
@@ -2906,6 +2949,10 @@ function getPlatformQuotaStatus() {
     props.setProperty('FB_PAGE_COUNTS', '{}');
     props.setProperty('IG_COUNTS', '{}');
     props.setProperty('COUNT_FB_GROUP', '0');
+    props.setProperty('COUNT_GMB', '0');
+    const _minGmb = Math.max(1, Number(config.MIN_GMB_POST_PER_DAY) || 2);
+    const _maxGmb = Math.max(_minGmb, Number(config.MAX_GMB_POST_PER_DAY) || 4);
+    props.setProperty('TARGET_GMB', String(Math.floor(Math.random() * (_maxGmb - _minGmb + 1)) + _minGmb));
     
     // Buat target harian acak independen untuk setiap Page ID
     rawPageIds.forEach(pId => {
@@ -3037,10 +3084,30 @@ function getPlatformQuotaStatus() {
   const isGroupIntervalMet = !lastGroupPostTime || (now.getTime() - new Date(lastGroupPostTime).getTime() >= groupMinIntervalMs);
   const canPostFbGroup = nextGroupInfo && nextGroupInfo.isEligible && countGroup < targetGroup && isGroupIntervalMet;
   
+  // 4. Google Maps Bisnis (GBP) Status
+  const countGmb = Number(props.getProperty('COUNT_GMB') || '0');
+  const minGmb = Math.max(1, Number(config.MIN_GMB_POST_PER_DAY) || 2);
+  const maxGmb = Math.max(minGmb, Number(config.MAX_GMB_POST_PER_DAY) || 4);
+  let targetGmb = Number(props.getProperty('TARGET_GMB'));
+  if (!targetGmb || targetGmb < minGmb || targetGmb > maxGmb) {
+    targetGmb = Math.floor(Math.random() * (maxGmb - minGmb + 1)) + minGmb;
+    props.setProperty('TARGET_GMB', String(targetGmb));
+  }
+  const lastGmbPostTime = props.getProperty('LAST_GMB_POST_TIME');
+  const gmbCooldownMins = Math.max(15, Number(config.GMB_COOLDOWN_MINUTES) || 120);
+  let diffMinsGmb = 999999;
+  if (lastGmbPostTime) {
+    diffMinsGmb = (now.getTime() - new Date(lastGmbPostTime).getTime()) / (1000 * 60);
+  }
+  const isGmbQuotaLeft = countGmb < targetGmb;
+  const isGmbCooldownMet = diffMinsGmb >= gmbCooldownMins;
+  const canPostGmb = isGmbQuotaLeft && isGmbCooldownMet;
+  
   return {
     canPostFb,
     canPostIg,
     canPostFbGroup,
+    canPostGmb,
     nextFbPageInfo,
     nextIgInfo,
     nextGroupInfo,
@@ -3051,9 +3118,277 @@ function getPlatformQuotaStatus() {
     countFb: totalFbCount, targetFb: totalFbTarget, // fallback compatibility
     countIg: totalIgCount, targetIg: totalIgTarget,
     countGroup, targetGroup,
+    countGmb, targetGmb,
     minFbPerDay: minFb, maxFbPerDay: maxFb,
     minIgPerDay: minIg, maxIgPerDay: maxIg,
-    fbCooldownMins, igCooldownMins,
+    minGmbPerDay: minGmb, maxGmbPerDay: maxGmb,
+    fbCooldownMins, igCooldownMins, gmbCooldownMins,
+    diffMinsGmb,
+    isGmbEligible: canPostGmb,
+    isGmbConfigured: Boolean(config.GMB_WEBHOOK_URL || config.GMB_LOCATION_ID),
     groupIntervalDays: Number(config.FB_GROUP_INTERVAL_DAYS) || 3
   };
+}
+
+// ==================== GOOGLE MAPS BISNIS (GOOGLE BUSINESS PROFILE) ====================
+
+function saveGmbPostHistory() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const nowTs = new Date().toISOString();
+    props.setProperty('LAST_GMB_POST_TIME', nowTs);
+    const count = (Number(props.getProperty('COUNT_GMB')) || 0) + 1;
+    props.setProperty('COUNT_GMB', String(count));
+  } catch(e) {}
+}
+
+function getGmbCountInfo() {
+  const props = PropertiesService.getScriptProperties();
+  const config = getConfig();
+  const minGmb = Math.max(1, Number(config.MIN_GMB_POST_PER_DAY) || 2);
+  const maxGmb = Math.max(minGmb, Number(config.MAX_GMB_POST_PER_DAY) || 4);
+  const count = Number(props.getProperty('COUNT_GMB')) || 0;
+  let target = Number(props.getProperty('TARGET_GMB'));
+  if (!target || target < minGmb || target > maxGmb) {
+    target = Math.floor(Math.random() * (maxGmb - minGmb + 1)) + minGmb;
+    props.setProperty('TARGET_GMB', String(target));
+  }
+  return { count, target };
+}
+
+function postKeGoogleBisnis(summary, imageUrl, linkUrl, customTitle) {
+  const config = getConfig();
+  const mode = String(config.GMB_POST_MODE || 'direct').toLowerCase();
+  const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
+  const ctaUrl = linkUrl || `https://wa.me/${cleanWa}`;
+  const actionType = config.GMB_ACTION_TYPE || 'LEARN_MORE';
+
+  // JALUR 1: MODE WEBHOOK (Make.com / Zapier / n8n / Pabbly / Ayrshare)
+  if (mode === 'webhook' || (!config.GMB_LOCATION_ID && config.GMB_WEBHOOK_URL)) {
+    if (!config.GMB_WEBHOOK_URL) {
+      return { success: false, error: 'URL Webhook Google Maps Bisnis belum diisi di Pengaturan' };
+    }
+    try {
+      const webhookPayload = {
+        title: customTitle || 'Update Produk CV Nafindo Group',
+        summary: summary || '',
+        imageUrl: imageUrl || '',
+        actionUrl: ctaUrl,
+        actionType: actionType,
+        company: config.COMPANY_NAME || 'CV Nafindo Group',
+        whatsapp: config.WHATSAPP_NUMBER || '',
+        timestamp: new Date().toISOString()
+      };
+      
+      const res = UrlFetchApp.fetch(config.GMB_WEBHOOK_URL, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify(webhookPayload),
+        muteHttpExceptions: true
+      });
+      
+      const code = res.getResponseCode();
+      const text = res.getContentText();
+      if (code >= 200 && code < 300) {
+        saveGmbPostHistory();
+        const cInfo = getGmbCountInfo();
+        return {
+          success: true,
+          mode: 'webhook',
+          response: text,
+          count: cInfo.count,
+          target: cInfo.target
+        };
+      } else {
+        return { success: false, mode: 'webhook', error: `Webhook gagal (HTTP ${code}): ${text.substring(0, 200)}` };
+      }
+    } catch(err) {
+      return { success: false, mode: 'webhook', error: 'Exception Webhook: ' + err.toString() };
+    }
+  }
+
+  // JALUR 2: DIRECT GOOGLE BUSINESS PROFILE API
+  const rawLoc = String(config.GMB_LOCATION_ID || '').trim();
+  if (!rawLoc) {
+    return { success: false, error: 'Location / Profile ID Google Maps Bisnis belum diisi di Pengaturan' };
+  }
+
+  const locId = rawLoc.replace(/^locations\//, '');
+  const rawAcc = String(config.GMB_ACCOUNT_ID || '').trim();
+  let accId = rawAcc.replace(/^accounts\//, '');
+
+  let token = String(config.GMB_ACCESS_TOKEN || '').trim();
+  if (!token) {
+    try {
+      token = ScriptApp.getOAuthToken();
+    } catch(eTok) {
+      console.warn('Gagal getOAuthToken: ' + eTok);
+    }
+  }
+
+  if (!token) {
+    return { success: false, error: 'Akses token Google tidak tersedia. Pastikan script telah diotorisasi atau isi GMB_ACCESS_TOKEN di Pengaturan.' };
+  }
+
+  // Jika Account ID belum diisi, coba auto-discover dari API
+  if (!accId) {
+    try {
+      const accRes = UrlFetchApp.fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
+        method: 'get',
+        headers: { 'Authorization': 'Bearer ' + token },
+        muteHttpExceptions: true
+      });
+      if (accRes.getResponseCode() === 200) {
+        const accJson = JSON.parse(accRes.getContentText());
+        if (accJson.accounts && accJson.accounts.length > 0) {
+          accId = accJson.accounts[0].name.replace(/^accounts\//, '');
+          console.log(`Auto-discovered Google Business Account ID: ${accId}`);
+        }
+      }
+    } catch(eAcc) {
+      console.warn('Auto-discovery account ID gagal: ' + eAcc);
+    }
+  }
+
+  if (!accId) {
+    accId = '1';
+  }
+
+  const endpoint = `https://mybusiness.googleapis.com/v4/accounts/${accId}/locations/${locId}/localPosts`;
+  
+  const postPayload = {
+    languageCode: 'id-ID',
+    summary: summary ? summary.substring(0, 1500) : '',
+    callToAction: {
+      actionType: actionType,
+      url: ctaUrl
+    },
+    topicType: 'STANDARD'
+  };
+
+  if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+    postPayload.media = [
+      {
+        mediaFormat: 'PHOTO',
+        sourceUrl: imageUrl
+      }
+    ];
+  }
+
+  try {
+    const res = UrlFetchApp.fetch(endpoint, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        'Authorization': 'Bearer ' + token
+      },
+      payload: JSON.stringify(postPayload),
+      muteHttpExceptions: true
+    });
+
+    const code = res.getResponseCode();
+    const text = res.getContentText();
+    let json = {};
+    try { json = JSON.parse(text); } catch(e) {}
+
+    if (code >= 200 && code < 300 && !json.error) {
+      saveGmbPostHistory();
+      const cInfo = getGmbCountInfo();
+      const searchUrl = json.searchUrl || `https://www.google.com/search?q=${encodeURIComponent(config.COMPANY_NAME || 'CV Nafindo Group')}`;
+      return {
+        success: true,
+        mode: 'direct',
+        id: json.name || json.localPostId || 'gmb-post',
+        url: searchUrl,
+        count: cInfo.count,
+        target: cInfo.target
+      };
+    } else {
+      let errMsg = json.error ? (json.error.message || JSON.stringify(json.error)) : (`Google API Error (${code}): ` + text);
+      if (code === 403 || code === 429) {
+        errMsg += ' [PENTING: Google Business Profile API membutuhkan Google Cloud Project approval, atau Anda dapat menggunakan Mode Webhook via Make.com/Zapier untuk posting langsung tanpa approval].';
+      }
+      return { success: false, mode: 'direct', error: errMsg };
+    }
+  } catch(err) {
+    return { success: false, mode: 'direct', error: 'Exception API Google Bisnis: ' + err.toString() };
+  }
+}
+
+function testGoogleBisnisPost() {
+  const config = getConfig();
+  const testSummary = `🚀 [TEST AUTOPOSTING]\n${config.COMPANY_NAME || 'CV Nafindo Group'} - Distributor Vinyl Lantai Resmi.\n\nSistem integrasi Google Maps Bisnis berhasil terhubung dengan sukses!\n\n📲 Info WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
+  const testImg = 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800';
+  const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
+  return postKeGoogleBisnis(testSummary, testImg, `https://wa.me/${cleanWa}`, 'Test Post Google Bisnis');
+}
+
+function diagnosaGoogleBisnis() {
+  const config = getConfig();
+  const res = {
+    isConfigured: false,
+    mode: config.GMB_POST_MODE || 'direct',
+    tokenStatus: 'Belum dicek',
+    accountsFound: [],
+    webhookStatus: 'N/A',
+    advice: []
+  };
+
+  const mode = String(config.GMB_POST_MODE || 'direct').toLowerCase();
+
+  if (mode === 'webhook') {
+    if (!config.GMB_WEBHOOK_URL) {
+      res.advice.push('URL Webhook masih kosong. Buat skenario Webhook di Make.com / Zapier / n8n lalu tempelkan URL webhook ke Pengaturan.');
+    } else {
+      res.isConfigured = true;
+      res.webhookStatus = 'URL Webhook aktif: ' + config.GMB_WEBHOOK_URL.substring(0, 50) + '...';
+      res.advice.push('Mode Webhook siap digunakan! Klik tombol "Test Post Google Maps Bisnis" untuk mengirim uji coba.');
+    }
+    return { success: true, data: res };
+  }
+
+  // Direct Mode Diagnosa
+  if (!config.GMB_LOCATION_ID) {
+    res.advice.push('Location / Profile ID Google Maps Bisnis belum diisi.');
+  } else {
+    res.isConfigured = true;
+    res.locationId = config.GMB_LOCATION_ID;
+  }
+
+  let token = config.GMB_ACCESS_TOKEN;
+  if (!token) {
+    try {
+      token = ScriptApp.getOAuthToken();
+      res.tokenStatus = token ? 'OAuth Token Apps Script Aktif' : 'Token tidak tersedia';
+    } catch(e) {
+      res.tokenStatus = 'Gagal mengambil OAuth Token: ' + e.toString();
+    }
+  } else {
+    res.tokenStatus = 'Custom Access Token terisi';
+  }
+
+  if (token) {
+    try {
+      const accRes = UrlFetchApp.fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
+        method: 'get',
+        headers: { 'Authorization': 'Bearer ' + token },
+        muteHttpExceptions: true
+      });
+      const code = accRes.getResponseCode();
+      const text = accRes.getContentText();
+      if (code === 200) {
+        const j = JSON.parse(text);
+        if (j.accounts) {
+          res.accountsFound = j.accounts.map(a => ({ name: a.name, accountName: a.accountName }));
+          res.advice.push('Berhasil terhubung dengan Akun Google Business Profile!');
+        }
+      } else if (code === 403 || code === 429) {
+        res.advice.push(`Google API mengembalikan status ${code}. Jika proyek Google Cloud Anda belum memiliki API Approval, beralihlah ke Mode Webhook (Make.com/Zapier/n8n) untuk posting instan tanpa persetujuan Google Cloud.`);
+      }
+    } catch(e) {
+      res.advice.push('Cek akun error: ' + e.toString());
+    }
+  }
+
+  return { success: true, data: res };
 }
