@@ -225,32 +225,58 @@
               <div class="stat-card" style="text-align:center"><div class="value" style="color:var(--success)" id="dailySukses">0</div><div class="label">Sukses</div></div>
               <div class="stat-card" style="text-align:center"><div class="value" style="color:var(--danger)" id="dailyGagal">0</div><div class="label">Gagal</div></div>
             </div>
+            <!-- Rincian Kanal Harian -->
+            <div id="dailyChannelBadges" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;"></div>
+            <div id="dailyChannelDetails" style="margin-top:8px;font-size:11px;color:var(--text-sec);display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>
           </div>
         </div>
 
         <!-- Monitoring Mingguan -->
         <div class="card">
-          <div class="card-header"><h3><i class="fas fa-calendar-week"></i> Monitoring Mingguan</h3></div>
+          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <h3 style="margin:0;"><i class="fas fa-calendar-week"></i> Monitoring Mingguan</h3>
+            <div class="btn-group" id="weeklyFilterGroup" style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button class="btn btn-sm btn-primary active" id="btnWf_all" onclick="setWeeklyChannelFilter('all')">🌐 Semua Kanal</button>
+              <button class="btn btn-sm btn-outline" id="btnWf_blogger" onclick="setWeeklyChannelFilter('blogger')">📝 Blogger</button>
+              <button class="btn btn-sm btn-outline" id="btnWf_fb" onclick="setWeeklyChannelFilter('fb')">📄 FB Page</button>
+              <button class="btn btn-sm btn-outline" id="btnWf_ig" onclick="setWeeklyChannelFilter('ig')">📸 Instagram</button>
+              <button class="btn btn-sm btn-outline" id="btnWf_fbGroup" onclick="setWeeklyChannelFilter('fbGroup')">👥 FB Group</button>
+              <button class="btn btn-sm btn-outline" id="btnWf_gmb" onclick="setWeeklyChannelFilter('gmb')">📍 GMB</button>
+            </div>
+          </div>
           <div class="card-body">
             <div class="date-nav">
               <button onclick="changeWeek(-1)"><i class="fas fa-chevron-left"></i></button>
               <span id="weeklyLabel">Minggu Ini</span>
               <button onclick="changeWeek(1)"><i class="fas fa-chevron-right"></i></button>
             </div>
+            <div id="weeklyChannelSummary" style="display:flex;justify-content:center;gap:8px;margin:-4px 0 12px 0;font-size:12px;flex-wrap:wrap;"></div>
             <div class="chart-container"><canvas id="weeklyChart"></canvas></div>
           </div>
         </div>
 
         <!-- Monitoring Bulanan -->
         <div class="card">
-          <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> Monitoring Bulanan</h3></div>
+          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <h3 style="margin:0;"><i class="fas fa-calendar-alt"></i> Monitoring Bulanan</h3>
+            <div class="btn-group" id="monthlyFilterGroup" style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button class="btn btn-sm btn-primary active" id="btnMf_all" onclick="setMonthlyChannelFilter('all')">🌐 Semua Kanal</button>
+              <button class="btn btn-sm btn-outline" id="btnMf_blogger" onclick="setMonthlyChannelFilter('blogger')">📝 Blogger</button>
+              <button class="btn btn-sm btn-outline" id="btnMf_fb" onclick="setMonthlyChannelFilter('fb')">📄 FB Page</button>
+              <button class="btn btn-sm btn-outline" id="btnMf_ig" onclick="setMonthlyChannelFilter('ig')">📸 Instagram</button>
+              <button class="btn btn-sm btn-outline" id="btnMf_fbGroup" onclick="setMonthlyChannelFilter('fbGroup')">👥 FB Group</button>
+              <button class="btn btn-sm btn-outline" id="btnMf_gmb" onclick="setMonthlyChannelFilter('gmb')">📍 GMB</button>
+              <button class="btn btn-sm btn-outline" id="btnMf_status" onclick="setMonthlyChannelFilter('status')">Sukses vs Gagal</button>
+            </div>
+          </div>
           <div class="card-body">
             <div class="date-nav">
               <button onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
               <span id="monthlyLabel">Bulan Ini</span>
               <button onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
             </div>
-            <div id="monthlySummary" style="text-align:center;font-size:12px;color:var(--text-sec);margin:-6px 0 12px 0;"></div>
+            <div id="monthlySummary" style="text-align:center;font-size:12px;color:var(--text-sec);margin:-6px 0 8px 0;"></div>
+            <div id="monthlyChannelSummary" style="display:flex;justify-content:center;gap:8px;margin:0 0 12px 0;font-size:12px;flex-wrap:wrap;"></div>
             <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
           </div>
         </div>
@@ -1084,6 +1110,10 @@
     let currentMonthOffset = 0;
     let weeklyChartInstance = null;
     let monthlyChartInstance = null;
+    let currentWeeklyChannelFilter = 'all';
+    let currentMonthlyChannelFilter = 'all';
+    let cachedWeeklyData = null;
+    let cachedMonthlyData = null;
 
     // ==================== NAVIGATION ====================
     function navigate(id, el) {
@@ -1327,8 +1357,43 @@
       }
     }
 
+    function renderChannelBadges(ct, containerId, detailsContainerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      if (!ct) { container.innerHTML = ''; return; }
+      
+      const b = ct.blogger || 0;
+      const f = ct.fb || 0;
+      const i = ct.ig || 0;
+      const g = ct.fbGroup || 0;
+      const m = ct.gmb || 0;
+      
+      container.innerHTML = `
+        <span class="badge" style="background:#fff3e0;color:#e65100;border:1px solid #ffe0b2;padding:4px 9px;font-size:11px;">📝 Blogger: <strong>${b}</strong></span>
+        <span class="badge" style="background:#e8f0fe;color:#1877f2;border:1px solid #d2e3fc;padding:4px 9px;font-size:11px;">📄 FB Page: <strong>${f}</strong></span>
+        <span class="badge" style="background:#fce4ec;color:#e4405f;border:1px solid #f8bbd0;padding:4px 9px;font-size:11px;">📸 Instagram: <strong>${i}</strong></span>
+        <span class="badge" style="background:#e1f5fe;color:#0d8af0;border:1px solid #b3e5fc;padding:4px 9px;font-size:11px;">👥 FB Group: <strong>${g}</strong></span>
+        <span class="badge" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;padding:4px 9px;font-size:11px;">📍 Google Bisnis: <strong>${m}</strong></span>
+      `;
+      
+      if (detailsContainerId) {
+        const detailsContainer = document.getElementById(detailsContainerId);
+        if (detailsContainer) {
+          if (ct.details && Object.keys(ct.details).length > 0) {
+            detailsContainer.innerHTML = '<strong>Rincian Target:</strong> ' + Object.entries(ct.details).map(([k, v]) => `<span style="background:#f1f3f4;padding:2px 6px;border-radius:4px;border:1px solid #ddd;">${k}: <strong>${v}</strong></span>`).join(' ');
+          } else {
+            detailsContainer.innerHTML = '';
+          }
+        }
+      }
+    }
+
     async function loadDailyStats() {
-      const dateStr = currentDate.toISOString().split('T')[0];
+      const year = currentDate.getFullYear();
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
       document.getElementById('dailyDate').textContent = currentDate.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       try {
         const data = await apiGet('getStatsByDate', { date: dateStr });
@@ -1336,6 +1401,7 @@
           document.getElementById('dailyTotal').textContent = data.total;
           document.getElementById('dailySukses').textContent = data.sukses;
           document.getElementById('dailyGagal').textContent = data.gagal;
+          renderChannelBadges(data.channelTotals, 'dailyChannelBadges', 'dailyChannelDetails');
         }
       } catch(e) {}
     }
@@ -1349,27 +1415,89 @@
       try {
         const data = await apiGet('getWeeklyStats', { offset: currentWeekOffset });
         if (!data.success) return;
+        cachedWeeklyData = data;
         document.getElementById('weeklyLabel').textContent = getWeekLabel(currentWeekOffset);
-        
-        const labels = Object.keys(data.byDate).sort();
-        const sukses = labels.map(d => data.byDate[d].sukses);
-        const gagal = labels.map(d => data.byDate[d].gagal);
-        
-        const ctx = document.getElementById('weeklyChart').getContext('2d');
-        if (weeklyChartInstance) weeklyChartInstance.destroy();
-        
-        weeklyChartInstance = new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels: labels.map(d => new Date(d).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric' })),
-            datasets: [
-              { label: 'Sukses', data: sukses, backgroundColor: '#34a853', borderRadius: 4 },
-              { label: 'Gagal', data: gagal, backgroundColor: '#ea4335', borderRadius: 4 }
-            ]
-          },
-          options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
-        });
+        renderChannelBadges(data.channelTotals, 'weeklyChannelSummary', null);
+        renderWeeklyChart(data);
       } catch(e) {}
+    }
+
+    function setWeeklyChannelFilter(filter) {
+      currentWeeklyChannelFilter = filter;
+      ['all', 'blogger', 'fb', 'ig', 'fbGroup', 'gmb'].forEach(k => {
+        const btn = document.getElementById('btnWf_' + k);
+        if (btn) {
+          btn.className = (k === filter) ? 'btn btn-sm btn-primary active' : 'btn btn-sm btn-outline';
+        }
+      });
+      if (cachedWeeklyData) renderWeeklyChart(cachedWeeklyData);
+    }
+
+    function renderWeeklyChart(data) {
+      if (!data || !data.byDate) return;
+      const labels = Object.keys(data.byDate).sort();
+      const dateLabels = labels.map(d => new Date(d).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric' }));
+      
+      let datasets = [];
+      const isAll = (currentWeeklyChannelFilter === 'all');
+      
+      if (isAll) {
+        datasets = [
+          { label: 'Blogger', data: labels.map(d => data.byDate[d].blogger || 0), backgroundColor: '#ff5722', borderRadius: 4 },
+          { label: 'FB Page', data: labels.map(d => data.byDate[d].fb || 0), backgroundColor: '#1877f2', borderRadius: 4 },
+          { label: 'Instagram', data: labels.map(d => data.byDate[d].ig || 0), backgroundColor: '#e4405f', borderRadius: 4 },
+          { label: 'FB Group', data: labels.map(d => data.byDate[d].fbGroup || 0), backgroundColor: '#0d8af0', borderRadius: 4 },
+          { label: 'Google Bisnis', data: labels.map(d => data.byDate[d].gmb || 0), backgroundColor: '#34a853', borderRadius: 4 }
+        ];
+      } else if (currentWeeklyChannelFilter === 'blogger') {
+        datasets = [{ label: 'Blogger', data: labels.map(d => data.byDate[d].blogger || 0), backgroundColor: '#ff5722', borderRadius: 4 }];
+      } else if (currentWeeklyChannelFilter === 'fb') {
+        datasets = [{ label: 'FB Page', data: labels.map(d => data.byDate[d].fb || 0), backgroundColor: '#1877f2', borderRadius: 4 }];
+      } else if (currentWeeklyChannelFilter === 'ig') {
+        datasets = [{ label: 'Instagram', data: labels.map(d => data.byDate[d].ig || 0), backgroundColor: '#e4405f', borderRadius: 4 }];
+      } else if (currentWeeklyChannelFilter === 'fbGroup') {
+        datasets = [{ label: 'FB Group', data: labels.map(d => data.byDate[d].fbGroup || 0), backgroundColor: '#0d8af0', borderRadius: 4 }];
+      } else if (currentWeeklyChannelFilter === 'gmb') {
+        datasets = [{ label: 'Google Bisnis', data: labels.map(d => data.byDate[d].gmb || 0), backgroundColor: '#34a853', borderRadius: 4 }];
+      }
+      
+      const ctx = document.getElementById('weeklyChart').getContext('2d');
+      if (weeklyChartInstance) weeklyChartInstance.destroy();
+      
+      weeklyChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: dateLabels,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { boxWidth: 12, font: { size: 11 } }
+            },
+            tooltip: {
+              callbacks: {
+                footer: function(items) {
+                  let total = 0;
+                  items.forEach(it => { total += (Number(it.raw) || 0); });
+                  return 'Total Hari Ini: ' + total + ' post';
+                }
+              }
+            }
+          },
+          scales: {
+            x: { stacked: isAll, grid: { display: false } },
+            y: { stacked: isAll, beginAtZero: true, ticks: { stepSize: 1, precision: 0 } }
+          }
+        }
+      });
     }
 
     function changeWeek(dir) {
@@ -1387,160 +1515,158 @@
       try {
         const data = await apiGet('getMonthlyStats', { offset: currentMonthOffset });
         if (!data.success) return;
+        cachedMonthlyData = data;
         document.getElementById('monthlyLabel').textContent = getMonthLabel(currentMonthOffset);
-        
-        // Tentukan tahun, bulan, dan total hari dalam bulan yang dipilih
-        const dObj = new Date();
-        dObj.setDate(1);
-        dObj.setMonth(dObj.getMonth() + currentMonthOffset);
-        const year = data.year || dObj.getFullYear();
-        const month = (data.month !== undefined) ? (data.month - 1) : dObj.getMonth();
-        const daysInMonth = data.daysInMonth || new Date(year, month + 1, 0).getDate();
-        
-        const now = new Date();
-        const isCurrentMonth = (now.getFullYear() === year && now.getMonth() === month);
-        const todayDate = now.getDate();
-        
-        const labels = [];
-        const suksesList = [];
-        const gagalList = [];
-        
-        for (let day = 1; day <= daysInMonth; day++) {
-          labels.push(day);
-          
-          const monthStr = String(month + 1).padStart(2, '0');
-          const dayStr = String(day).padStart(2, '0');
-          const dateKey = `${year}-${monthStr}-${dayStr}`;
-          
-          // Untuk bulan berjalan, jangan teruskan garis ke masa depan agar grafik tidak anjlok ke 0
-          if (isCurrentMonth && day > todayDate) {
-            suksesList.push(null);
-            gagalList.push(null);
-          } else {
-            const entry = (data.byDate && data.byDate[dateKey]) ? data.byDate[dateKey] : null;
-            suksesList.push(entry ? (entry.sukses || 0) : 0);
-            gagalList.push(entry ? (entry.gagal || 0) : 0);
-          }
-        }
         
         const summaryEl = document.getElementById('monthlySummary');
         if (summaryEl) {
-          summaryEl.innerHTML = `Total: <strong>${data.total || 0}</strong> post • <span style="color:#188038;font-weight:600">Sukses: ${data.sukses || 0}</span> • <span style="color:#d93025;font-weight:600">Gagal: ${data.gagal || 0}</span>`;
+          summaryEl.innerHTML = `Total Semua Kanal: <strong>${data.total || 0}</strong> post • <span style="color:#188038;font-weight:600">Sukses: ${data.sukses || 0}</span> • <span style="color:#d93025;font-weight:600">Gagal: ${data.gagal || 0}</span>`;
         }
-        
-        const ctx = document.getElementById('monthlyChart').getContext('2d');
-        if (monthlyChartInstance) monthlyChartInstance.destroy();
-        
-        monthlyChartInstance = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [
-              { 
-                label: 'Sukses', 
-                data: suksesList, 
-                borderColor: '#34a853', 
-                backgroundColor: 'rgba(52,168,83,0.12)', 
-                borderWidth: 2.5,
-                pointRadius: 3,
-                pointHoverRadius: 6,
-                pointBackgroundColor: '#34a853',
-                fill: true, 
-                tension: 0.35,
-                spanGaps: false
-              },
-              { 
-                label: 'Gagal', 
-                data: gagalList, 
-                borderColor: '#ea4335', 
-                backgroundColor: 'rgba(234,67,53,0.08)', 
-                borderWidth: 2,
-                pointRadius: 2.5,
-                pointHoverRadius: 5,
-                pointBackgroundColor: '#ea4335',
-                fill: true, 
-                tension: 0.35,
-                spanGaps: false
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-              mode: 'index',
-              intersect: false
-            },
-            plugins: {
-              tooltip: {
-                callbacks: {
-                  title: function(items) {
-                    if (!items.length) return '';
-                    const dayNum = items[0].label;
-                    const dateObj = new Date(year, month, Number(dayNum));
-                    return dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-                  },
-                  label: function(item) {
-                    return ` ${item.dataset.label}: ${item.raw !== null ? item.raw : 0} post`;
-                  },
-                  footer: function(items) {
-                    let total = 0;
-                    items.forEach(it => {
-                      if (it.raw !== null) total += Number(it.raw);
-                    });
-                    return 'Total: ' + total + ' postingan';
-                  }
-                }
-              },
-              legend: {
-                position: 'top',
-                labels: {
-                  boxWidth: 12,
-                  font: { size: 12, family: 'Inter, sans-serif' }
-                }
-              }
-            },
-            scales: {
-              x: {
-                title: {
-                  display: true,
-                  text: 'Tanggal (Hari)',
-                  font: { size: 11, weight: '500' },
-                  color: '#888'
-                },
-                grid: {
-                  display: false
-                },
-                ticks: {
-                  maxRotation: 0,
-                  autoSkip: true,
-                  maxTicksLimit: 16,
-                  font: { size: 11 }
-                }
-              },
-              y: {
-                beginAtZero: true,
-                title: {
-                  display: true,
-                  text: 'Jumlah Post',
-                  font: { size: 11, weight: '500' },
-                  color: '#888'
-                },
-                ticks: {
-                  precision: 0,
-                  stepSize: 1,
-                  font: { size: 11 }
-                },
-                grid: {
-                  color: '#f0f0f0'
-                }
-              }
-            }
-          }
-        });
+        renderChannelBadges(data.channelTotals, 'monthlyChannelSummary', null);
+        renderMonthlyChart(data);
       } catch(e) {
         console.error('Error loadMonthlyStats:', e);
       }
+    }
+
+    function setMonthlyChannelFilter(filter) {
+      currentMonthlyChannelFilter = filter;
+      ['all', 'blogger', 'fb', 'ig', 'fbGroup', 'gmb', 'status'].forEach(k => {
+        const btn = document.getElementById('btnMf_' + k);
+        if (btn) {
+          btn.className = (k === filter) ? 'btn btn-sm btn-primary active' : 'btn btn-sm btn-outline';
+        }
+      });
+      if (cachedMonthlyData) renderMonthlyChart(cachedMonthlyData);
+    }
+
+    function renderMonthlyChart(data) {
+      if (!data) return;
+      const dObj = new Date();
+      dObj.setDate(1);
+      dObj.setMonth(dObj.getMonth() + currentMonthOffset);
+      const year = data.year || dObj.getFullYear();
+      const month = (data.month !== undefined) ? (data.month - 1) : dObj.getMonth();
+      const daysInMonth = data.daysInMonth || new Date(year, month + 1, 0).getDate();
+      
+      const now = new Date();
+      const isCurrentMonth = (now.getFullYear() === year && now.getMonth() === month);
+      const todayDate = now.getDate();
+      
+      const labels = [];
+      const bloggerList = [];
+      const fbList = [];
+      const igList = [];
+      const fbGroupList = [];
+      const gmbList = [];
+      const suksesList = [];
+      const gagalList = [];
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        labels.push(day);
+        
+        const monthStr = String(month + 1).padStart(2, '0');
+        const dayStr = String(day).padStart(2, '0');
+        const dateKey = `${year}-${monthStr}-${dayStr}`;
+        
+        if (isCurrentMonth && day > todayDate) {
+          bloggerList.push(null);
+          fbList.push(null);
+          igList.push(null);
+          fbGroupList.push(null);
+          gmbList.push(null);
+          suksesList.push(null);
+          gagalList.push(null);
+        } else {
+          const entry = (data.byDate && data.byDate[dateKey]) ? data.byDate[dateKey] : null;
+          bloggerList.push(entry ? (entry.blogger || 0) : 0);
+          fbList.push(entry ? (entry.fb || 0) : 0);
+          igList.push(entry ? (entry.ig || 0) : 0);
+          fbGroupList.push(entry ? (entry.fbGroup || 0) : 0);
+          gmbList.push(entry ? (entry.gmb || 0) : 0);
+          suksesList.push(entry ? (entry.sukses || 0) : 0);
+          gagalList.push(entry ? (entry.gagal || 0) : 0);
+        }
+      }
+      
+      let datasets = [];
+      if (currentMonthlyChannelFilter === 'all') {
+        datasets = [
+          { label: 'Blogger', data: bloggerList, borderColor: '#ff5722', backgroundColor: 'rgba(255,87,34,0.08)', borderWidth: 2, pointRadius: 2.5, tension: 0.35, spanGaps: false },
+          { label: 'FB Page', data: fbList, borderColor: '#1877f2', backgroundColor: 'rgba(24,119,242,0.08)', borderWidth: 2.5, pointRadius: 3, tension: 0.35, spanGaps: false },
+          { label: 'Instagram', data: igList, borderColor: '#e4405f', backgroundColor: 'rgba(228,64,95,0.08)', borderWidth: 2.5, pointRadius: 3, tension: 0.35, spanGaps: false },
+          { label: 'FB Group', data: fbGroupList, borderColor: '#0d8af0', backgroundColor: 'rgba(13,138,240,0.08)', borderWidth: 2, pointRadius: 2.5, tension: 0.35, spanGaps: false },
+          { label: 'Google Bisnis', data: gmbList, borderColor: '#34a853', backgroundColor: 'rgba(52,168,83,0.08)', borderWidth: 2, pointRadius: 2.5, tension: 0.35, spanGaps: false }
+        ];
+      } else if (currentMonthlyChannelFilter === 'blogger') {
+        datasets = [{ label: 'Blogger', data: bloggerList, borderColor: '#ff5722', backgroundColor: 'rgba(255,87,34,0.12)', fill: true, borderWidth: 2.5, pointRadius: 3, tension: 0.35, spanGaps: false }];
+      } else if (currentMonthlyChannelFilter === 'fb') {
+        datasets = [{ label: 'Facebook Page', data: fbList, borderColor: '#1877f2', backgroundColor: 'rgba(24,119,242,0.12)', fill: true, borderWidth: 2.5, pointRadius: 3, tension: 0.35, spanGaps: false }];
+      } else if (currentMonthlyChannelFilter === 'ig') {
+        datasets = [{ label: 'Instagram', data: igList, borderColor: '#e4405f', backgroundColor: 'rgba(228,64,95,0.12)', fill: true, borderWidth: 2.5, pointRadius: 3, tension: 0.35, spanGaps: false }];
+      } else if (currentMonthlyChannelFilter === 'fbGroup') {
+        datasets = [{ label: 'FB Group', data: fbGroupList, borderColor: '#0d8af0', backgroundColor: 'rgba(13,138,240,0.12)', fill: true, borderWidth: 2.5, pointRadius: 3, tension: 0.35, spanGaps: false }];
+      } else if (currentMonthlyChannelFilter === 'gmb') {
+        datasets = [{ label: 'Google Bisnis', data: gmbList, borderColor: '#34a853', backgroundColor: 'rgba(52,168,83,0.12)', fill: true, borderWidth: 2.5, pointRadius: 3, tension: 0.35, spanGaps: false }];
+      } else if (currentMonthlyChannelFilter === 'status') {
+        datasets = [
+          { label: 'Sukses', data: suksesList, borderColor: '#34a853', backgroundColor: 'rgba(52,168,83,0.12)', fill: true, borderWidth: 2.5, pointRadius: 3, tension: 0.35, spanGaps: false },
+          { label: 'Gagal', data: gagalList, borderColor: '#ea4335', backgroundColor: 'rgba(234,67,53,0.08)', fill: true, borderWidth: 2, pointRadius: 2.5, tension: 0.35, spanGaps: false }
+        ];
+      }
+      
+      const ctx = document.getElementById('monthlyChart').getContext('2d');
+      if (monthlyChartInstance) monthlyChartInstance.destroy();
+      
+      monthlyChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                title: function(items) {
+                  if (!items.length) return '';
+                  const dayNum = items[0].label;
+                  const dateObj = new Date(year, month, Number(dayNum));
+                  return dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                },
+                footer: function(items) {
+                  let total = 0;
+                  items.forEach(it => { if (it.raw !== null) total += Number(it.raw); });
+                  return 'Total Hari Ini: ' + total + ' postingan';
+                }
+              }
+            },
+            legend: {
+              position: 'top',
+              labels: { boxWidth: 12, font: { size: 11, family: 'Inter, sans-serif' } }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: 'Tanggal (Hari)', font: { size: 11, weight: '500' }, color: '#888' },
+              grid: { display: false },
+              ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 16 }
+            },
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'Jumlah Post', font: { size: 11, weight: '500' }, color: '#888' },
+              ticks: { precision: 0, stepSize: 1 },
+              grid: { color: '#f0f0f0' }
+            }
+          }
+        }
+      });
     }
 
     function changeMonth(dir) {

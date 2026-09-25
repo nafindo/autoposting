@@ -1158,17 +1158,94 @@ function getQueueStatus() {
   return { success: true, produk: result };
 }
 
+/**
+ * Ekstrak kanal/platform postingan dari kolom Status (misal: 'Sukses [Blogger, FB: Nafindogroup, IG: @groupnafindo]')
+ */
+function parseChannelsFromStatus(statusStr) {
+  const s = String(statusStr || '');
+  const isSukses = s.toLowerCase().includes('sukses');
+  const isGagal = s.toLowerCase().includes('gagal');
+  
+  const res = {
+    isSukses,
+    isGagal,
+    blogger: 0,
+    fb: 0,
+    ig: 0,
+    fbGroup: 0,
+    gmb: 0,
+    details: []
+  };
+  
+  if (!isSukses && !isGagal) return res;
+  
+  const match = s.match(/\[(.*?)\]/);
+  if (match && match[1]) {
+    const parts = match[1].split(',').map(p => p.trim()).filter(Boolean);
+    parts.forEach(part => {
+      res.details.push(part);
+      const lower = part.toLowerCase();
+      if (lower.includes('blogger')) {
+        res.blogger++;
+      } else if (lower.startsWith('fb group') || lower.includes('group')) {
+        res.fbGroup++;
+      } else if (lower.startsWith('fb') || lower.includes('facebook')) {
+        res.fb++;
+      } else if (lower.startsWith('ig') || lower.includes('instagram')) {
+        res.ig++;
+      } else if (lower.includes('google') || lower.includes('gmb') || lower.includes('bisnis')) {
+        res.gmb++;
+      }
+    });
+  } else {
+    // Log lama tanpa kurung siku [ ... ] default adalah Blogger
+    if (isSukses) res.blogger = 1;
+  }
+  
+  return res;
+}
+
 function getStatsByDate(dateStr) {
-  const targetDate = new Date(dateStr).toDateString();
-  const logs = getLog(1000);
-  const filtered = logs.filter(l => new Date(l.timestamp).toDateString() === targetDate);
+  const tz = Session.getScriptTimeZone();
+  const logs = getLog(3000);
+  const filtered = logs.filter(l => {
+    if (!l.timestamp) return false;
+    try {
+      const dStr = Utilities.formatDate(new Date(l.timestamp), tz, 'yyyy-MM-dd');
+      return dStr === dateStr;
+    } catch(e) { return false; }
+  });
+  
+  const channelTotals = {
+    blogger: 0,
+    fb: 0,
+    ig: 0,
+    fbGroup: 0,
+    gmb: 0,
+    details: {}
+  };
+  
+  filtered.forEach(l => {
+    const parsed = parseChannelsFromStatus(l.status);
+    if (parsed.isSukses) {
+      channelTotals.blogger += parsed.blogger;
+      channelTotals.fb += parsed.fb;
+      channelTotals.ig += parsed.ig;
+      channelTotals.fbGroup += parsed.fbGroup;
+      channelTotals.gmb += parsed.gmb;
+      parsed.details.forEach(item => {
+        channelTotals.details[item] = (channelTotals.details[item] || 0) + 1;
+      });
+    }
+  });
   
   return {
     success: true,
     date: dateStr,
     total: filtered.length,
-    sukses: filtered.filter(l => l.status.includes('Sukses')).length,
-    gagal: filtered.filter(l => l.status.includes('Gagal')).length,
+    sukses: filtered.filter(l => String(l.status || '').includes('Sukses')).length,
+    gagal: filtered.filter(l => !String(l.status || '').includes('Sukses')).length,
+    channelTotals,
     data: filtered
   };
 }
@@ -1212,12 +1289,53 @@ function getStatsRange(start, end, type) {
   });
   
   const byDate = {};
+  const channelTotals = {
+    blogger: 0,
+    fb: 0,
+    ig: 0,
+    fbGroup: 0,
+    gmb: 0,
+    details: {}
+  };
+  
   filtered.forEach(l => {
     try {
       const d = Utilities.formatDate(new Date(l.timestamp), tz, 'yyyy-MM-dd');
-      if (!byDate[d]) byDate[d] = { sukses: 0, gagal: 0 };
-      if (String(l.status || '').includes('Sukses')) byDate[d].sukses++;
-      else byDate[d].gagal++;
+      if (!byDate[d]) {
+        byDate[d] = { 
+          sukses: 0, 
+          gagal: 0, 
+          blogger: 0, 
+          fb: 0, 
+          ig: 0, 
+          fbGroup: 0, 
+          gmb: 0, 
+          details: {} 
+        };
+      }
+      
+      const parsed = parseChannelsFromStatus(l.status);
+      if (parsed.isSukses) {
+        byDate[d].sukses++;
+        byDate[d].blogger += parsed.blogger;
+        byDate[d].fb += parsed.fb;
+        byDate[d].ig += parsed.ig;
+        byDate[d].fbGroup += parsed.fbGroup;
+        byDate[d].gmb += parsed.gmb;
+        
+        channelTotals.blogger += parsed.blogger;
+        channelTotals.fb += parsed.fb;
+        channelTotals.ig += parsed.ig;
+        channelTotals.fbGroup += parsed.fbGroup;
+        channelTotals.gmb += parsed.gmb;
+        
+        parsed.details.forEach(item => {
+          byDate[d].details[item] = (byDate[d].details[item] || 0) + 1;
+          channelTotals.details[item] = (channelTotals.details[item] || 0) + 1;
+        });
+      } else {
+        byDate[d].gagal++;
+      }
     } catch(e) {}
   });
   
@@ -1229,6 +1347,7 @@ function getStatsRange(start, end, type) {
     total: filtered.length,
     sukses: filtered.filter(l => String(l.status || '').includes('Sukses')).length,
     gagal: filtered.filter(l => !String(l.status || '').includes('Sukses')).length,
+    channelTotals,
     byDate,
     data: filtered.slice(0, 100)
   };
@@ -2946,6 +3065,7 @@ function postKeInstagram(caption, imageUrl, specificIgId) {
     return {
       success: true,
       igId: targetIgId,
+      username: (targetIgId === '17841435273175737' ? 'groupnafindo' : ''),
       id: igPostId,
       url: `https://www.instagram.com/p/${igPostId}/`,
       count: countInfo.count,
@@ -3064,7 +3184,14 @@ function testFacebookPost() {
     console.warn("AI Pollinations sedang antre/limit, menggunakan gambar arsitektur default untuk uji coba: " + eAi);
   }
   
-  return postKeFacebook(testMsg, testImg, '');
+  const res = postKeFacebook(testMsg, testImg, '');
+  if (res && res.success) {
+    const pTag = res.pageName ? `FB: ${res.pageName}` : `FB (${res.pageId || ''})`;
+    addLog('Test Facebook Page', 'Test Posting Media', `Sukses [${pTag}]`, res.url || '', '');
+  } else if (res && res.error) {
+    addLog('Test Facebook Page', 'Test Posting Media', 'Gagal [Facebook Page]', '', res.error);
+  }
+  return res;
 }
 
 function testInstagramPost() {
@@ -3073,7 +3200,14 @@ function testInstagramPost() {
   const igTag = nextEligible ? `[Target IG: ${nextEligible.igId}]` : '';
   const testImg = 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800';
   const testCaption = `🚀 [TEST AUTOPOST] Halo Instagram! ${igTag}\n\nSistem integrasi Instagram Bisnis berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n#nafindo #testautopost`;
-  return postKeInstagram(testCaption, testImg);
+  const res = postKeInstagram(testCaption, testImg);
+  if (res && res.success) {
+    const igName = res.username ? `IG: @${res.username}` : (res.igId ? `IG (${res.igId})` : 'IG');
+    addLog('Test Instagram Bisnis', 'Test Posting Media', `Sukses [${igName}]`, res.url || '', '');
+  } else if (res && res.error) {
+    addLog('Test Instagram Bisnis', 'Test Posting Media', 'Gagal [Instagram]', '', res.error);
+  }
+  return res;
 }
 
 function getNextEligibleFbGroup() {
@@ -3310,7 +3444,14 @@ function testFacebookGroupPost() {
     }
   } catch(e) {}
   
-  return postKeFacebookGroup(testMsg, testImg, '');
+  const res = postKeFacebookGroup(testMsg, testImg, '');
+  if (res && res.success) {
+    const grpTag = res.groupId ? `FB Group (${res.groupId})` : 'FB Group';
+    addLog('Test Facebook Group', 'Test Posting Media', `Sukses [${grpTag}]`, res.url || '', '');
+  } else if (res && res.error) {
+    addLog('Test Facebook Group', 'Test Posting Media', 'Gagal [FB Group]', '', res.error);
+  }
+  return res;
 }
 
 function getPlatformQuotaStatus() {
@@ -3719,7 +3860,13 @@ function testGoogleBisnisPost(data) {
   const testSummary = `🚀 [TEST AUTOPOSTING]\n${config.COMPANY_NAME || 'CV Nafindo Group'} - Distributor Vinyl Lantai Resmi.\n\nSistem integrasi Google Maps Bisnis berhasil terhubung dengan sukses!\n\n📲 Info WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
   const testImg = 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800';
   const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
-  return postKeGoogleBisnis(testSummary, testImg, `https://wa.me/${cleanWa}`, 'Test Post Google Bisnis');
+  const res = postKeGoogleBisnis(testSummary, testImg, `https://wa.me/${cleanWa}`, 'Test Post Google Bisnis');
+  if (res && res.success) {
+    addLog('Test Google Bisnis', 'Google Business Profile', 'Sukses [Google Bisnis]', res.url || `https://wa.me/${cleanWa}`, '');
+  } else if (res && res.error) {
+    addLog('Test Google Bisnis', 'Google Business Profile', 'Gagal [Google Bisnis]', '', res.error);
+  }
+  return res;
 }
 
 function diagnosaGoogleBisnis(data) {
