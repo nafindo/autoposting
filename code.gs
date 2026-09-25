@@ -1177,7 +1177,7 @@ function getWeeklyStats(offset) {
   const now = new Date();
   const day = now.getDay();
   const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(now.setDate(diff - (offset * 7)));
+  const monday = new Date(now.setDate(diff + ((Number(offset) || 0) * 7)));
   monday.setHours(0,0,0,0);
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
@@ -1188,37 +1188,47 @@ function getWeeklyStats(offset) {
 
 function getMonthlyStats(offset) {
   const now = new Date();
-  const month = now.getMonth() - offset;
-  const year = now.getFullYear() + Math.floor(month / 12);
-  const adjMonth = ((month % 12) + 12) % 12;
+  const targetDate = new Date(now.getFullYear(), now.getMonth() + (Number(offset) || 0), 1);
+  const year = targetDate.getFullYear();
+  const month = targetDate.getMonth();
   
-  const firstDay = new Date(year, adjMonth, 1);
-  const lastDay = new Date(year, adjMonth + 1, 0, 23, 59, 59);
+  const firstDay = new Date(year, month, 1, 0, 0, 0, 0);
+  const lastDay = new Date(year, month + 1, 0, 23, 59, 59, 999);
   
-  return getStatsRange(firstDay, lastDay, 'month');
+  const res = getStatsRange(firstDay, lastDay, 'month');
+  res.year = year;
+  res.month = month + 1;
+  res.daysInMonth = lastDay.getDate();
+  return res;
 }
 
 function getStatsRange(start, end, type) {
-  const logs = getLog(2000);
+  const logs = getLog(5000);
+  const tz = Session.getScriptTimeZone();
   const filtered = logs.filter(l => {
+    if (!l.timestamp) return false;
     const d = new Date(l.timestamp);
     return d >= start && d <= end;
   });
   
   const byDate = {};
   filtered.forEach(l => {
-    const d = new Date(l.timestamp).toISOString().split('T')[0];
-    if (!byDate[d]) byDate[d] = { sukses: 0, gagal: 0 };
-    if (l.status.includes('Sukses')) byDate[d].sukses++;
-    else byDate[d].gagal++;
+    try {
+      const d = Utilities.formatDate(new Date(l.timestamp), tz, 'yyyy-MM-dd');
+      if (!byDate[d]) byDate[d] = { sukses: 0, gagal: 0 };
+      if (String(l.status || '').includes('Sukses')) byDate[d].sukses++;
+      else byDate[d].gagal++;
+    } catch(e) {}
   });
   
   return {
-    success: true, type,
-    start: start.toISOString(), end: end.toISOString(),
+    success: true, 
+    type,
+    start: start.toISOString(), 
+    end: end.toISOString(),
     total: filtered.length,
-    sukses: filtered.filter(l => l.status.includes('Sukses')).length,
-    gagal: filtered.filter(l => l.status.includes('Gagal')).length,
+    sukses: filtered.filter(l => String(l.status || '').includes('Sukses')).length,
+    gagal: filtered.filter(l => !String(l.status || '').includes('Sukses')).length,
     byDate,
     data: filtered.slice(0, 100)
   };
@@ -1366,8 +1376,9 @@ function getQueue() {
     let pData = pSheet.getDataRange().getValues();
     let productQueue = [];
     
-    for (let j = 1; j < pData.length; j++) {
-      if (pData[j][0] && pData[j][6] !== 'Selesai' && pData[j][6] !== 'Gagal') {
+    // Cari keyword dari baris paling bawah ke atas (agar keyword lama/paling bawah terposting lebih dulu)
+    for (let j = pData.length - 1; j >= 1; j--) {
+      if (pData[j][0] && String(pData[j][0]).trim() && pData[j][6] !== 'Selesai' && pData[j][6] !== 'Gagal') {
         productQueue.push({
           produkId: produkId,
           produkNama: produkNama,
@@ -1388,11 +1399,11 @@ function getQueue() {
       console.log(`⚡ Sisa keyword untuk "${produkNama}" menipis (${productQueue.length} tersisa). Auto-generating 50 keyword baru...`);
       const refillRes = generateKeywordsFromMaster(produkId, 50);
       if (refillRes && refillRes.success && refillRes.added > 0) {
-        // Ambil data terbaru setelah auto-refill
+        // Ambil data terbaru setelah auto-refill (tetap cari dari bawah ke atas)
         pData = pSheet.getDataRange().getValues();
         productQueue = [];
-        for (let j = 1; j < pData.length; j++) {
-          if (pData[j][0] && pData[j][6] !== 'Selesai' && pData[j][6] !== 'Gagal') {
+        for (let j = pData.length - 1; j >= 1; j--) {
+          if (pData[j][0] && String(pData[j][0]).trim() && pData[j][6] !== 'Selesai' && pData[j][6] !== 'Gagal') {
             productQueue.push({
               produkId: produkId,
               produkNama: produkNama,
@@ -1414,9 +1425,12 @@ function getQueue() {
   }
   
   // Sort: yang paling sedikit diposting hari ini dulu, lalu prioritas (1 = VIP)
+  // Untuk produk yang sama, prioritaskan baris paling bawah (row terbesar)
   queue.sort((a, b) => {
     if (a.todayCount !== b.todayCount) return a.todayCount - b.todayCount;
-    return a.prioritas - b.prioritas;
+    if (a.prioritas !== b.prioritas) return a.prioritas - b.prioritas;
+    if (a.produkId === b.produkId) return b.row - a.row;
+    return 0;
   });
   
   return queue;
@@ -1987,7 +2001,7 @@ function getAIDescription(nama, kw, tipe, spec) {
     ? config.GROQ_MODEL 
     : 'openai/gpt-oss-120b';
   
-  const prompt = `Buat konten penawaran produk profesional untuk Blog dan Media Sosial (Facebook & Instagram).
+  const prompt = `Buat konten penawaran produk untuk Blog dan Sosial Media (Facebook & Instagram) dengan gaya bahasa yang NATURAL, LUWES, dan SEPERTI BUATAN MANUSIA. Hindari pola kalimat yang berulang atau monoton. Buat sudut pandang (angle) promosi yang berbeda-beda setiap kali merespons!
 
 PRODUK UTAMA: ${nama}
 KATA KUNCI/JUDUL: ${kw}
@@ -1999,20 +2013,20 @@ NAMA PERUSAHAAN: ${config.COMPANY_NAME || ''}
 
 TUGAS:
 1. ARTIKEL BLOG:
-   - Judul SEO: kata kunci menarik | produk | kota Indonesia acak | ${config.WHATSAPP_NUMBER}
-   - Deskripsi: 3-4 paragraf HTML persuasif, SEO-friendly, bahasa Indonesia. Fokus 100% pada produk "${nama}" dan kata kunci "${kw}".
-   - Tabel: HTML spesifikasi, header #4285f4 teks putih.
-   - JANGAN mengarang data spesifikasi di luar data asli, dan DILARANG menyebut produk/material jenis lain yang berbeda kategori.
-2. CAPTION SOSIAL MEDIA (Facebook & Instagram):
-   - Hook / Headline menarik dengan emoji yang pas
-   - 3-4 poin keunggulan & manfaat produk singkat & padat
-   - Call to Action (CTA) ke WhatsApp ${config.WHATSAPP_NUMBER}
-   - 10-15 Hashtags (#) yang relevan & populer
-   - Format Teks Bersih (Plain Text, TANPA tag HTML)
+   - Judul SEO: Buat judul yang sangat natural dan bervariasi. Campurkan kata kunci, produk, nama kota acak di Indonesia, dan nomor ${config.WHATSAPP_NUMBER}. Jangan selalu menggunakan format pemisah "|".
+   - Deskripsi: 3-4 paragraf HTML persuasif & SEO-friendly. Gunakan gaya bahasa storytelling, problem-solving, atau edukasi. Hindari bahasa yang terlalu kaku atau "robotik". Fokus pada produk "${nama}" dan kata kunci "${kw}".
+   - Tabel: HTML spesifikasi, header #4285f4 teks putih. JANGAN mengarang data spesifikasi di luar data asli.
+2. CAPTION SOSIAL MEDIA (Facebook & Instagram) - SANGAT PENTING:
+   - JANGAN selalu memulai dengan "Halo", "Butuh...", atau sapaan standar. Gunakan Hook/Headline yang out-of-the-box (contoh: cerita singkat, fakta unik, pertanyaan menggelitik, atau soft-selling natural).
+   - Tulis seolah-olah kamu adalah admin manusia yang sedang update status atau ngobrol santai namun tetap mengarah ke penjualan.
+   - 3-4 poin keunggulan & manfaat produk (gunakan format poin-poin yang bervariasi).
+   - Call to Action (CTA) ke WhatsApp ${config.WHATSAPP_NUMBER} dengan kalimat ajakan yang tidak membosankan.
+   - 10-15 Hashtags (#) yang relevan & populer.
+   - Format Teks Bersih (Plain Text, TANPA tag HTML).
 3. VISUAL PROMPT (1 kalimat singkat bahasa Inggris untuk visual foto produk yang 100% relevan):
    - Contoh: "modern interior room with clean minimalist ${nama} flooring, daylight, commercial architectural photography 8k"
 
-OUTPUT JSON:
+OUTPUT JSON (HANYA JSON, TANPA MARKDOWN):
 {"title":"...","description":"...","table":"...","socialCaption":"...","visualPrompt":"..."}`;
 
   try {
@@ -2022,10 +2036,10 @@ OUTPUT JSON:
       payload: JSON.stringify({
         model: model,
         messages: [
-          { role: 'system', content: 'Kamu penulis konten marketing profesional Indonesia. Return JSON valid.' },
+          { role: 'system', content: 'Kamu adalah Copywriter Senior (Manusia Asli) dari Indonesia yang ahli membuat konten jualan soft-selling & hard-selling dengan gaya bahasa yang sangat bervariasi, tidak kaku, dan natural. Wajib Return JSON valid.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.7, max_tokens: 2048,
+        temperature: 0.9, max_tokens: 2048,
         response_format: { type: 'json_object' }
       }),
       muteHttpExceptions: true
@@ -2046,46 +2060,205 @@ OUTPUT JSON:
 
 /**
  * Smart Social Media Photo Selector (Khusus Facebook & Instagram)
- * 1. Prioritas 1: Foto yang dicentang Layak Medsos (dari Hero, Varian desain, atau Gallery)
- * 2. Prioritas 2: Jika tidak ada centang khusus, fallback ke foto Gallery ruangan yang ada
- * 3. Prioritas 3: Render AI Ruangan Terpasang Estetik (100% Gratis Pollinations Flux/SDXL - 0 Token)
+ * 1. Prioritas 1: Render Gambar AI Estetik (Pollinations Flux/SDXL - 100% Gratis)
+ * 2. Prioritas 2 (Fallback): Foto yang dicentang Layak Medsos (#medsos) dari Sheet Produk
+ * 3. Prioritas 3 (Fallback): Foto Hero & Gallery dari Katalog Produk
  */
 function getSmartSocialPhoto(pData, item, aiData) {
-  const pool = [];
+  const prodName = (item && item.produkNama) ? item.produkNama : 'Produk';
+  const kw = (item && item.keyword) ? item.keyword : 'Interior';
   
-  // Prioritas 1: Ambil semua foto yang ditandai centang "Medsos" oleh user (baik dari Hero, Varian, maupun Gallery)
-  if (pData && pData.medsosEligiblePhotos && pData.medsosEligiblePhotos.length > 0) {
-    pData.medsosEligiblePhotos.forEach(link => {
-      const img = getImageUrlFromLink(link);
-      if (img && !pool.includes(img)) pool.push(img);
-    });
-  }
-  
-  // Prioritas 2: Jika belum ada satupun foto yang dicentang medsos, gunakan foto dari Gallery jika ada
-  if (pool.length === 0 && pData && (pData.gallery || pData.saranWarna)) {
-    const gal = pData.gallery || pData.saranWarna || [];
-    gal.forEach(g => {
-      const img = getImageUrlFromLink(g);
-      if (img && !pool.includes(img)) pool.push(img);
-    });
-  }
-  
-  // Jika ditemukan foto di pool, pilih salah satu secara acak
-  if (pool.length > 0) {
-    return pool[Math.floor(Math.random() * pool.length)];
-  }
-  
-  // Prioritas 3: Render AI Ruangan Terpasang Estetik jika sama sekali tidak ada foto yang layak
-  const prodName = item ? item.produkNama : 'Produk';
-  const kw = item ? item.keyword : 'Interior';
+  // 1. Susun visual prompt yang estetik dan komersial
   let visualPrompt = (aiData && aiData.visualPrompt) 
     ? aiData.visualPrompt 
     : `luxurious modern interior living room showcasing installed ${prodName} ${kw}, architectural photography, natural sunlight, aesthetic interior design 8k`;
   
-  const cleanPrompt = encodeURIComponent(String(visualPrompt).substring(0, 150).replace(/[^a-zA-Z0-9\s,]/g, ''));
-  const randomSeed = Math.floor(Math.random() * 99999);
-  return `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1080&height=1080&nologo=true&seed=${randomSeed}`;
+  const cleanPrompt = encodeURIComponent(String(visualPrompt).substring(0, 180).replace(/[^a-zA-Z0-9\s,]/g, ''));
+  const randomSeed = Math.floor(Math.random() * 999999);
+  const aiUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1080&height=1080&nologo=true&seed=${randomSeed}`;
+  
+  console.log(`[Smart Social Photo] Memulai render gambar AI: "${visualPrompt.substring(0, 60)}..."`);
+  
+  // 2. Fetch langsung gambar AI untuk validasi dan caching
+  try {
+    const aiRes = UrlFetchApp.fetch(aiUrl, { muteHttpExceptions: true, timeout: 35000 });
+    const code = aiRes.getResponseCode();
+    if (code === 200) {
+      const blob = aiRes.getBlob();
+      const size = blob.getBytes().length;
+      const type = blob.getContentType() || '';
+      
+      if (size > 2000 && !type.includes('text/html')) {
+        blob.setName(`ai_${randomSeed}.jpg`);
+        blob.setContentType('image/jpeg');
+        console.log(`[Smart Social Photo] ✅ Gambar AI berhasil dirender (${Math.round(size / 1024)} KB)`);
+        
+        // Simpan ke Google Drive agar memiliki link CDN publik permanen (sangat bagus untuk IG & arsip)
+        try {
+          const driveSaved = saveAiPhotoToDrive(blob, `AI_${prodName.replace(/[^a-zA-Z0-9]/g, '_')}_${randomSeed}.jpg`);
+          if (driveSaved && driveSaved.url) {
+            return driveSaved.url;
+          }
+        } catch(eDrive) {
+          console.warn("[Smart Social Photo] Simpan AI ke Drive dilewati: " + eDrive);
+        }
+        
+        return aiUrl;
+      } else {
+        console.warn(`[Smart Social Photo] AI Pollinations mengembalikan data bukan gambar (size: ${size}, type: ${type})`);
+      }
+    } else {
+      console.warn(`[Smart Social Photo] AI Pollinations response HTTP ${code}`);
+    }
+  } catch(eAi) {
+    console.warn("[Smart Social Photo] Gagal request AI Pollinations: " + eAi);
+  }
+  
+  // 3. FALLBACK CERDAS: Jika AI render gagal/timeout, gunakan foto asli dari katalog produk sheet
+  console.log("[Smart Social Photo] AI tidak merespons, beralih ke foto produk asli (fallback)...");
+  
+  // 3a. Foto yang ditandai #medsos
+  if (pData && pData.medsosEligiblePhotos && pData.medsosEligiblePhotos.length > 0) {
+    const selected = pData.medsosEligiblePhotos[Math.floor(Math.random() * pData.medsosEligiblePhotos.length)];
+    const cleanUrl = getImageUrlFromLink(selected) || selected;
+    console.log("[Smart Social Photo] Menggunakan fallback foto #medsos: " + cleanUrl);
+    return cleanUrl;
+  }
+  
+  // 3b. Foto Hero
+  if (pData && pData.heroImages && pData.heroImages.length > 0) {
+    const selected = pData.heroImages[Math.floor(Math.random() * pData.heroImages.length)];
+    const cleanUrl = getImageUrlFromLink(selected) || selected;
+    console.log("[Smart Social Photo] Menggunakan fallback foto Hero: " + cleanUrl);
+    return cleanUrl;
+  }
+  
+  // 3c. Foto Gallery
+  const galleryList = (pData && pData.gallery && pData.gallery.length > 0) ? pData.gallery : ((pData && pData.saranWarna) || []);
+  if (galleryList.length > 0) {
+    const selected = galleryList[Math.floor(Math.random() * galleryList.length)];
+    const cleanUrl = getImageUrlFromLink(selected) || selected;
+    console.log("[Smart Social Photo] Menggunakan fallback foto Gallery: " + cleanUrl);
+    return cleanUrl;
+  }
+  
+  // 3d. Fallback terakhir jika seluruh foto produk kosong dan AI limit/gagal
+  return 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=1080&q=80';
 }
+
+/**
+ * Menyimpan gambar hasil render AI ke Google Drive secara otomatis
+ * dan membuat permission publik agar dapat diakses cepat oleh CDN & Instagram
+ */
+function saveAiPhotoToDrive(blob, fileName) {
+  try {
+    const config = getConfig();
+    let folder = null;
+    const targetFolderId = config.DRIVE_FOLDER_ID;
+    
+    if (targetFolderId) {
+      try {
+        folder = DriveApp.getFolderById(targetFolderId);
+      } catch(e) {}
+    }
+    
+    if (!folder) {
+      const folders = DriveApp.getFoldersByName("AutoPosting_AI_Images");
+      if (folders.hasNext()) {
+        folder = folders.next();
+      } else {
+        folder = DriveApp.createFolder("AutoPosting_AI_Images");
+      }
+    }
+    
+    try {
+      folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch(e) {}
+    
+    const cleanName = fileName || ('AI_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '.jpg');
+    blob.setName(cleanName);
+    blob.setContentType('image/jpeg');
+    const file = folder.createFile(blob);
+    
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch(e) {}
+    
+    const fileId = file.getId();
+    const directUrl = `https://lh3.googleusercontent.com/d/${fileId}=s1200`;
+    console.log(`[Drive] Gambar AI berhasil disimpan ke Drive: ${cleanName} (${directUrl})`);
+    return { success: true, fileId: fileId, url: directUrl };
+  } catch(err) {
+    console.warn("[Drive] Gagal simpan foto AI ke Google Drive: " + err);
+    return null;
+  }
+}
+
+/**
+ * Mengonversi link gambar publik / Google Drive / URL AI menjadi Blob gambar valid
+ * Siap dikirimkan langsung sebagai binary 'source' (multipart/form-data) ke Facebook Graph API
+ */
+function getImageBlob(imageUrl) {
+  if (!imageUrl) return null;
+  
+  // Jika input sudah merupakan Blob
+  if (typeof imageUrl === 'object' && typeof imageUrl.getBytes === 'function') {
+    return imageUrl;
+  }
+  
+  let strUrl = String(imageUrl).split('|')[0].trim();
+  if (!strUrl.startsWith('http')) return null;
+
+  // Kasus 1: Link Google Drive
+  if (strUrl.includes('drive.google.com') || strUrl.includes('googleusercontent.com/d/')) {
+    const match = strUrl.match(/[-\w]{25,}/);
+    if (match) {
+      try {
+        const file = DriveApp.getFileById(match[0]);
+        const blob = file.getBlob();
+        if (blob && blob.getBytes().length > 1000) {
+          blob.setName('drive_' + match[0] + '.jpg');
+          blob.setContentType('image/jpeg');
+          return blob;
+        }
+      } catch(eDrive) {
+        console.warn('Gagal ambil blob via DriveApp: ' + eDrive);
+      }
+    }
+  }
+
+  // Kasus 2: URL Eksternal (Pollinations AI, CDN, Web)
+  try {
+    const res = UrlFetchApp.fetch(strUrl, {
+      muteHttpExceptions: true,
+      followRedirects: true,
+      validateHttpsCertificates: false,
+      timeout: 35000
+    });
+    
+    const code = res.getResponseCode();
+    if (code === 200) {
+      const blob = res.getBlob();
+      const contentType = blob.getContentType() || '';
+      const size = blob.getBytes().length;
+      
+      if (size > 1500 && !contentType.includes('text/html')) {
+        blob.setContentType('image/jpeg');
+        blob.setName('photo_' + new Date().getTime() + '.jpg');
+        return blob;
+      } else {
+        console.warn(`URL ${strUrl} menghasilkan response bukan gambar (size: ${size}, type: ${contentType})`);
+      }
+    } else {
+      console.warn(`Gagal fetch gambar dari ${strUrl}: HTTP ${code}`);
+    }
+  } catch(eFetch) {
+    console.warn(`Exception fetch gambar (${strUrl}): ` + eFetch);
+  }
+
+  return null;
+}
+
 
 function buildModernTemplate(d) {
   const config = getConfig();
@@ -2468,6 +2641,73 @@ function diagnosaMetaToken() {
   }
 }
 
+/**
+ * Pemetaan Page Access Token spesifik dan permanen untuk masing-masing Halaman Facebook
+ */
+const PAGE_SPECIFIC_TOKENS = {
+  '106730322002791': 'EAAP6mMry8owBSi1i3FmZAXlNIIDyrECk3LAa0REtCykeu0AQhWXVjD1rZB4wDHnENfZCWLlGK02N9ZC9XjjmOqNly8LPn3Yn4pj0pRvTkoy6eHxDqjpuL1iFvGQjaZBnyhdrRV6wz4dDJyeV31X0C9TtsYrIMeD0OMHEBZBTkD41zQUsWm4i88mAkvIQgI0r9RL8yTPiEZD',
+  '117130745621408': 'EAAP6mMry8owBSp4tKUP5rXrfZB54oviGSLCgxjkdbfaeQpjnhJnOcOou1ZB8qGL5A3sqKqDdNMuYDZCqdE03x3qGNxZAwD6adBLbBUMiQpF0dWkZAZCCsUsNXCD8rGZB7J7V7bwSZBUA4HonfsF5zRXqJ84jWOIZAsytuJkk5KMP1OnT2WyEPZCyXTuCU9ZCAYi5GuKLOUWhaoZD'
+};
+
+/**
+ * Mendapatkan Page Access Token resmi untuk Page ID yang dituju.
+ * Mengutamakan pemetaan Page Access Token resmi yang telah diverifikasi,
+ * lalu /me/accounts, lalu /{pageId}?fields=access_token.
+ */
+function getEffectivePageToken(targetPageId, mainToken) {
+  const pId = String(targetPageId || '').trim();
+  
+  // 1. Cek langsung dari pemetaan Page Token spesifik resmi
+  if (pId && PAGE_SPECIFIC_TOKENS[pId]) {
+    const pageName = pId === '117130745621408' ? 'Nafindogroup' : (pId === '106730322002791' ? 'Tentukan Glory' : '');
+    console.log(`[Meta Token] ✅ Menggunakan Page Access Token resmi untuk "${pageName}" (${pId})`);
+    return { token: PAGE_SPECIFIC_TOKENS[pId], name: pageName };
+  }
+  
+  // 2. Parse jika mainToken berisi format multiline atau pemetaan ID:Token
+  if (mainToken && mainToken.includes(pId)) {
+    const lines = String(mainToken).split(/[\n,;]/);
+    for (let line of lines) {
+      if (line.includes(pId) && line.includes(':')) {
+        const parts = line.split(':');
+        if (parts.length >= 2) return { token: parts.slice(1).join(':').trim(), name: '' };
+      }
+    }
+  }
+  
+  if (!mainToken) return { token: '', name: '' };
+  
+  // 3. Dapatkan Page Access Token resmi via /me/accounts (jika mainToken adalah User Token)
+  try {
+    const accRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token&access_token=${encodeURIComponent(mainToken)}`, { muteHttpExceptions: true });
+    const accJson = JSON.parse(accRes.getContentText());
+    if (accJson.data && Array.isArray(accJson.data)) {
+      const match = accJson.data.find(p => String(p.id) === pId);
+      if (match && match.access_token) {
+        console.log(`[Meta Token] ✅ Berhasil mendapatkan Page Access Token via /me/accounts untuk "${match.name}" (${pId})`);
+        return { token: match.access_token, name: match.name || '' };
+      }
+    }
+  } catch(eAcc) {
+    console.warn("[Meta Token] /me/accounts error: " + eAcc);
+  }
+  
+  // 4. Coba via /{pageId}?fields=access_token,name
+  try {
+    const ptRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${pId}?fields=access_token,name&access_token=${encodeURIComponent(mainToken)}`, { muteHttpExceptions: true });
+    const ptJson = JSON.parse(ptRes.getContentText());
+    if (ptJson.access_token) {
+      return { token: ptJson.access_token, name: ptJson.name || '' };
+    }
+    if (ptJson.name) {
+      return { token: mainToken, name: ptJson.name };
+    }
+  } catch(ePt) {}
+  
+  // 5. Fallback gunakan mainToken
+  return { token: mainToken, name: '' };
+}
+
 function postKeFacebook(caption, imageUrl, linkUrl, specificPageId) {
   const config = getConfig();
   const rawPageIds = String(config.FB_PAGE_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
@@ -2483,19 +2723,10 @@ function postKeFacebook(caption, imageUrl, linkUrl, specificPageId) {
     targetPageId = (nextEligible && nextEligible.pageId) ? nextEligible.pageId : rawPageIds[0];
   }
   
-  let pageToken = mainToken;
-  let pageName = '';
-  // Coba dapatkan Page Access Token spesifik untuk Page ID ini
-  try {
-    const ptRes = UrlFetchApp.fetch(`https://graph.facebook.com/v19.0/${targetPageId}?fields=access_token,name&access_token=${encodeURIComponent(mainToken)}`, { muteHttpExceptions: true });
-    const ptJson = JSON.parse(ptRes.getContentText());
-    if (ptJson.access_token) {
-      pageToken = ptJson.access_token;
-    }
-    if (ptJson.name) {
-      pageName = ptJson.name;
-    }
-  } catch(ePt) {}
+  // Dapatkan Page Access Token otentik dari Meta
+  const pageInfo = getEffectivePageToken(targetPageId, mainToken);
+  const pageToken = pageInfo.token || mainToken;
+  const pageName = pageInfo.name || '';
   
   let finalMessage = caption || '';
   if (linkUrl && !finalMessage.includes(linkUrl)) {
@@ -2504,32 +2735,88 @@ function postKeFacebook(caption, imageUrl, linkUrl, specificPageId) {
   
   let posted = false;
   let postResObj = null;
+  let lastPhotoError = '';
   
-  // Opsi 1: Coba upload Foto jika ada imageUrl publik
-  if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
-    try {
-      const photoUrl = `https://graph.facebook.com/v19.0/${targetPageId}/photos`;
-      const photoRes = UrlFetchApp.fetch(photoUrl, {
-        method: 'post',
-        payload: {
-          url: imageUrl,
-          caption: finalMessage,
-          access_token: pageToken
-        },
-        muteHttpExceptions: true
-      });
-      
-      const pJson = JSON.parse(photoRes.getContentText());
-      if (!pJson.error && (pJson.id || pJson.post_id)) {
-        const postId = pJson.post_id || pJson.id;
-        postResObj = { success: true, pageId: targetPageId, pageName: pageName, id: postId, url: `https://www.facebook.com/${postId}` };
-        posted = true;
+  // Opsi 1: Upload Foto ke Halaman FB
+  if (imageUrl) {
+    const imageBlob = getImageBlob(imageUrl);
+    const photoUrl = `https://graph.facebook.com/v19.0/${targetPageId}/photos`;
+    
+    // 1a. Upload Binary Blob langsung (PALING STABIL & MENCEGAH TIMEOUT CRAWLER FB)
+    if (imageBlob) {
+      try {
+        const photoRes = UrlFetchApp.fetch(photoUrl, {
+          method: 'post',
+          payload: {
+            source: imageBlob,
+            caption: finalMessage,
+            published: 'true',
+            access_token: pageToken
+          },
+          muteHttpExceptions: true
+        });
+        
+        const pJson = JSON.parse(photoRes.getContentText());
+        if (!pJson.error && (pJson.id || pJson.post_id)) {
+          const postId = pJson.post_id || pJson.id;
+          postResObj = { success: true, pageId: targetPageId, pageName: pageName, id: postId, url: `https://www.facebook.com/${postId}`, isPhoto: true };
+          posted = true;
+          console.log(`✅ Berhasil upload foto via Blob ke Facebook Page [${targetPageId}]`);
+        } else {
+          lastPhotoError = pJson.error ? (pJson.error.message || JSON.stringify(pJson.error)) : 'Gagal upload binary foto';
+          console.warn(`⚠️ FB Photo Blob Error [${targetPageId}]: ` + lastPhotoError);
+        }
+      } catch(eBlob) {
+        lastPhotoError = eBlob.toString();
+        console.warn(`⚠️ FB Photo Blob Exception: ` + eBlob);
       }
-    } catch(ePhoto) {}
+    }
+    
+    // 1b. Fallback upload via URL publik jika blob gagal atau tidak didapat
+    if (!posted && typeof imageUrl === 'string' && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+      try {
+        const photoRes = UrlFetchApp.fetch(photoUrl, {
+          method: 'post',
+          payload: {
+            url: imageUrl,
+            caption: finalMessage,
+            published: 'true',
+            access_token: pageToken
+          },
+          muteHttpExceptions: true
+        });
+        
+        const pJson = JSON.parse(photoRes.getContentText());
+        if (!pJson.error && (pJson.id || pJson.post_id)) {
+          const postId = pJson.post_id || pJson.id;
+          postResObj = { success: true, pageId: targetPageId, pageName: pageName, id: postId, url: `https://www.facebook.com/${postId}`, isPhoto: true };
+          posted = true;
+          console.log(`✅ Berhasil upload foto via URL ke Facebook Page [${targetPageId}]`);
+        } else {
+          lastPhotoError = pJson.error ? (pJson.error.message || JSON.stringify(pJson.error)) : 'Gagal upload foto via URL';
+          console.warn(`⚠️ FB Photo URL Error [${targetPageId}]: ` + lastPhotoError);
+        }
+      } catch(eUrl) {
+        lastPhotoError = eUrl.toString();
+        console.warn(`⚠️ FB Photo URL Exception: ` + eUrl);
+      }
+    }
   }
   
-  // Opsi 2 (atau Fallback): Post ke Feed Halaman
+  // Opsi 2: Jika upload foto diminta tapi gagal, LAPORKAN ERROR secara jujur & JANGAN diam-diam fallback teks!
   if (!posted) {
+    if (imageUrl) {
+      console.error(`❌ Postingan FB Page [${targetPageId}] gagal upload foto: ${lastPhotoError}`);
+      return { 
+        success: false, 
+        pageId: targetPageId, 
+        pageName: pageName, 
+        error: `Gagal upload gambar ke FB Page: ${lastPhotoError}`,
+        photoError: lastPhotoError 
+      };
+    }
+    
+    // Hanya post ke Feed (hanya teks) jika memang dari awal postingan ini TIDAK meminta gambar
     try {
       const feedUrl = `https://graph.facebook.com/v19.0/${targetPageId}/feed`;
       const feedRes = UrlFetchApp.fetch(feedUrl, {
@@ -2547,7 +2834,14 @@ function postKeFacebook(caption, imageUrl, linkUrl, specificPageId) {
       
       if (code < 300 && !json.error) {
         const postId = json.post_id || json.id;
-        postResObj = { success: true, pageId: targetPageId, pageName: pageName, id: postId, url: `https://www.facebook.com/${postId}` };
+        postResObj = { 
+          success: true, 
+          pageId: targetPageId, 
+          pageName: pageName, 
+          id: postId, 
+          url: `https://www.facebook.com/${postId}`, 
+          isPhoto: false 
+        };
       } else {
         const errMsg = json.error ? (json.error.message || JSON.stringify(json.error)) : ('FB API Error (' + code + '): ' + text);
         postResObj = { success: false, pageId: targetPageId, error: errMsg };
@@ -2571,7 +2865,9 @@ function postKeFacebook(caption, imageUrl, linkUrl, specificPageId) {
 function postKeInstagram(caption, imageUrl, specificIgId) {
   const config = getConfig();
   const rawIgIds = String(config.IG_ACCOUNT_ID || '').split(/[\n,]/).map(g => g.trim()).filter(Boolean);
-  const token = String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
+  const token = (typeof PAGE_SPECIFIC_TOKENS !== 'undefined' && PAGE_SPECIFIC_TOKENS['117130745621408'])
+    ? PAGE_SPECIFIC_TOKENS['117130745621408']
+    : String(config.FB_PAGE_ACCESS_TOKEN || '').trim();
   
   if (rawIgIds.length === 0 || !token) {
     return { success: false, error: 'Instagram Account ID atau Access Token belum diisi di Pengaturan' };
@@ -2583,9 +2879,15 @@ function postKeInstagram(caption, imageUrl, specificIgId) {
     targetIgId = (nextEligible && nextEligible.igId) ? nextEligible.igId : rawIgIds[0];
   }
   
-  if (!imageUrl || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
+  let cleanImageUrl = String(imageUrl || '').split('|')[0].trim();
+  cleanImageUrl = getImageUrlFromLink(cleanImageUrl) || cleanImageUrl;
+  
+  if (!cleanImageUrl || (!cleanImageUrl.startsWith('http://') && !cleanImageUrl.startsWith('https://'))) {
     return { success: false, error: 'Instagram membutuhkan minimal 1 URL gambar publik yang valid (JPEG/PNG)' };
   }
+  
+  // Tambahan jeda acak (2-5 detik) di awal eksekusi untuk menyamarkan pola request bot/autoposting
+  Utilities.sleep(Math.floor(Math.random() * 3000) + 2000);
   
   try {
     // Step 1: Buat Media Container
@@ -2593,7 +2895,7 @@ function postKeInstagram(caption, imageUrl, specificIgId) {
     const containerRes = UrlFetchApp.fetch(containerUrl, {
       method: 'post',
       payload: {
-        image_url: imageUrl,
+        image_url: cleanImageUrl,
         caption: caption || '',
         access_token: token
       },
@@ -2612,8 +2914,9 @@ function postKeInstagram(caption, imageUrl, specificIgId) {
     
     const creationId = cJson.id;
     
-    // Jeda 3 detik agar media diproses di server Meta
-    Utilities.sleep(3000);
+    // Jeda acak (5 - 12 detik) agar media diproses dan menambah variasi jeda (anti-spam/autopost detection)
+    const randomDelay = Math.floor(Math.random() * 7000) + 5000;
+    Utilities.sleep(randomDelay);
     
     // Step 2: Publish Container
     const publishUrl = `https://graph.facebook.com/v19.0/${targetIgId}/media_publish`;
@@ -2740,8 +3043,28 @@ function testFacebookPost() {
   const config = getConfig();
   const nextEligible = getNextEligibleFbPage();
   const pageTag = nextEligible ? `[Target Halaman: ${nextEligible.pageId}]` : '';
-  const testMsg = `🚀 [TEST AUTOPOST] Halo dari Nafindo Autoposting! ${pageTag}\n\nSistem integrasi Facebook Page berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
-  return postKeFacebook(testMsg, '', '');
+  const testMsg = `🚀 [TEST AUTOPOST + GAMBAR] Halo dari Nafindo Autoposting! ${pageTag}\n\nSistem integrasi Facebook Page & Upload Gambar berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
+  
+  // Gambar default arsitektur & interior estetik (Unsplash CDN - Cepat & 100% Stabil)
+  let testImg = 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=1080&q=80';
+  
+  // Coba render AI Pollinations jika server AI sedang merespons cepat
+  try {
+    const prompt = encodeURIComponent('luxury modern minimalist living room architectural photography 8k');
+    const aiUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1080&height=1080&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
+    const aiRes = UrlFetchApp.fetch(aiUrl, { muteHttpExceptions: true, timeout: 8000 });
+    if (aiRes.getResponseCode() === 200) {
+      const b = aiRes.getBlob();
+      if (b && b.getBytes().length > 2000) {
+        testImg = b;
+        console.log("✅ Berhasil render AI gambar untuk test posting.");
+      }
+    }
+  } catch(eAi) {
+    console.warn("AI Pollinations sedang antre/limit, menggunakan gambar arsitektur default untuk uji coba: " + eAi);
+  }
+  
+  return postKeFacebook(testMsg, testImg, '');
 }
 
 function testInstagramPost() {
@@ -2847,10 +3170,45 @@ function postKeFacebookGroup(caption, imageUrl, linkUrl, specificGroupId) {
     finalMessage = finalMessage.trim() + '\n\n🌐 ' + linkUrl;
   }
   
-  try {
-    if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+  let posted = false;
+  let lastPhotoError = '';
+  
+  // Opsi 1: Coba upload Foto ke Facebook Group jika ada imageUrl
+  if (imageUrl) {
+    const imageBlob = getImageBlob(imageUrl);
+    const photoUrl = `https://graph.facebook.com/v19.0/${targetGroupId}/photos`;
+    
+    // 1a. Upload Binary Blob langsung (PALING STABIL & MENCEGAH TIMEOUT CRAWLER FB)
+    if (imageBlob) {
       try {
-        const photoUrl = `https://graph.facebook.com/v19.0/${targetGroupId}/photos`;
+        const photoRes = UrlFetchApp.fetch(photoUrl, {
+          method: 'post',
+          payload: {
+            source: imageBlob,
+            caption: finalMessage,
+            access_token: token
+          },
+          muteHttpExceptions: true
+        });
+        const pJson = JSON.parse(photoRes.getContentText());
+        if (!pJson.error && (pJson.id || pJson.post_id)) {
+          const postId = pJson.post_id || pJson.id;
+          saveFbGroupPostHistory(targetGroupId);
+          console.log(`✅ Berhasil upload foto via Blob ke Facebook Group [${targetGroupId}]`);
+          return { success: true, groupId: targetGroupId, id: postId, url: `https://www.facebook.com/groups/${targetGroupId}/posts/${postId}`, isPhoto: true };
+        } else {
+          lastPhotoError = pJson.error ? (pJson.error.message || JSON.stringify(pJson.error)) : 'Gagal upload binary foto ke grup';
+          console.warn(`⚠️ FB Group Photo Blob Error: ` + lastPhotoError);
+        }
+      } catch(eBlob) {
+        lastPhotoError = eBlob.toString();
+        console.warn(`⚠️ FB Group Photo Blob Exception: ` + eBlob);
+      }
+    }
+    
+    // 1b. Fallback upload via URL publik jika blob tidak didapat
+    if (!posted && typeof imageUrl === 'string' && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+      try {
         const photoRes = UrlFetchApp.fetch(photoUrl, {
           method: 'post',
           payload: {
@@ -2864,12 +3222,24 @@ function postKeFacebookGroup(caption, imageUrl, linkUrl, specificGroupId) {
         if (!pJson.error && (pJson.id || pJson.post_id)) {
           const postId = pJson.post_id || pJson.id;
           saveFbGroupPostHistory(targetGroupId);
-          return { success: true, groupId: targetGroupId, id: postId, url: `https://www.facebook.com/groups/${targetGroupId}/posts/${postId}` };
+          console.log(`✅ Berhasil upload foto via URL ke Facebook Group [${targetGroupId}]`);
+          return { success: true, groupId: targetGroupId, id: postId, url: `https://www.facebook.com/groups/${targetGroupId}/posts/${postId}`, isPhoto: true };
+        } else {
+          lastPhotoError = pJson.error ? (pJson.error.message || JSON.stringify(pJson.error)) : 'Gagal upload foto via URL ke grup';
+          console.warn(`⚠️ FB Group Photo URL Error: ` + lastPhotoError);
         }
-      } catch(ePhoto) {}
+      } catch(eUrl) {
+        lastPhotoError = eUrl.toString();
+        console.warn(`⚠️ FB Group Photo URL Exception: ` + eUrl);
+      }
     }
-    
-    // Fallback ke feed grup
+  }
+  
+  // Opsi 2 (Fallback TERAKHIR): Post ke feed grup jika foto tidak ada atau gagal
+  if (imageUrl) {
+    console.warn(`⚠️ Menggunakan Fallback Post Teks ke FB Group [${targetGroupId}] karena upload foto gagal: ${lastPhotoError}`);
+  }
+  try {
     const feedUrl = `https://graph.facebook.com/v19.0/${targetGroupId}/feed`;
     const feedRes = UrlFetchApp.fetch(feedUrl, {
       method: 'post',
@@ -2891,10 +3261,17 @@ function postKeFacebookGroup(caption, imageUrl, linkUrl, specificGroupId) {
     } else {
       const postId = json.post_id || json.id;
       saveFbGroupPostHistory(targetGroupId);
-      return { success: true, groupId: targetGroupId, id: postId, url: `https://www.facebook.com/groups/${targetGroupId}/posts/${postId}` };
+      return { 
+        success: true, 
+        groupId: targetGroupId, 
+        id: postId, 
+        url: `https://www.facebook.com/groups/${targetGroupId}/posts/${postId}`, 
+        isPhoto: false, 
+        warning: lastPhotoError ? `Foto gagal diupload (${lastPhotoError}), dialihkan ke postingan teks.` : undefined 
+      };
     }
-  } catch(e) {
-    return { success: false, groupId: targetGroupId, error: e.toString() };
+  } catch(eFeed) {
+    return { success: false, groupId: targetGroupId, error: eFeed.toString() };
   }
 }
 
@@ -2918,8 +3295,22 @@ function testFacebookGroupPost() {
   const config = getConfig();
   const nextGroup = getNextEligibleFbGroup();
   const grpInfo = nextGroup ? `[Target Grup: ${nextGroup.groupId}]` : '';
-  const testMsg = `🚀 [TEST AUTOPOST] Halo Anggota Grup ${grpInfo}!\n\nSistem autoposting Facebook Group dari Nafindo berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
-  return postKeFacebookGroup(testMsg, '', '');
+  const testMsg = `🚀 [TEST AUTOPOST + GAMBAR] Halo Anggota Grup ${grpInfo}!\n\nSistem autoposting Facebook Group & Upload Gambar dari Nafindo berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
+  
+  let testImg = 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=1080&q=80';
+  try {
+    const prompt = encodeURIComponent('minimalist modern room interior aesthetic design photography 8k');
+    const aiUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1080&height=1080&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
+    const aiRes = UrlFetchApp.fetch(aiUrl, { muteHttpExceptions: true, timeout: 8000 });
+    if (aiRes.getResponseCode() === 200) {
+      const b = aiRes.getBlob();
+      if (b && b.getBytes().length > 2000) {
+        testImg = b;
+      }
+    }
+  } catch(e) {}
+  
+  return postKeFacebookGroup(testMsg, testImg, '');
 }
 
 function getPlatformQuotaStatus() {

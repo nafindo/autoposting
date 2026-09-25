@@ -250,6 +250,7 @@
               <span id="monthlyLabel">Bulan Ini</span>
               <button onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
             </div>
+            <div id="monthlySummary" style="text-align:center;font-size:12px;color:var(--text-sec);margin:-6px 0 12px 0;"></div>
             <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
           </div>
         </div>
@@ -1388,14 +1389,44 @@
         if (!data.success) return;
         document.getElementById('monthlyLabel').textContent = getMonthLabel(currentMonthOffset);
         
-        const byWeek = {};
-        Object.entries(data.byDate).forEach(([date, val]) => {
-          const d = new Date(date);
-          const week = Math.ceil(d.getDate() / 7);
-          if (!byWeek['Minggu ' + week]) byWeek['Minggu ' + week] = { sukses: 0, gagal: 0 };
-          byWeek['Minggu ' + week].sukses += val.sukses;
-          byWeek['Minggu ' + week].gagal += val.gagal;
-        });
+        // Tentukan tahun, bulan, dan total hari dalam bulan yang dipilih
+        const dObj = new Date();
+        dObj.setDate(1);
+        dObj.setMonth(dObj.getMonth() + currentMonthOffset);
+        const year = data.year || dObj.getFullYear();
+        const month = (data.month !== undefined) ? (data.month - 1) : dObj.getMonth();
+        const daysInMonth = data.daysInMonth || new Date(year, month + 1, 0).getDate();
+        
+        const now = new Date();
+        const isCurrentMonth = (now.getFullYear() === year && now.getMonth() === month);
+        const todayDate = now.getDate();
+        
+        const labels = [];
+        const suksesList = [];
+        const gagalList = [];
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+          labels.push(day);
+          
+          const monthStr = String(month + 1).padStart(2, '0');
+          const dayStr = String(day).padStart(2, '0');
+          const dateKey = `${year}-${monthStr}-${dayStr}`;
+          
+          // Untuk bulan berjalan, jangan teruskan garis ke masa depan agar grafik tidak anjlok ke 0
+          if (isCurrentMonth && day > todayDate) {
+            suksesList.push(null);
+            gagalList.push(null);
+          } else {
+            const entry = (data.byDate && data.byDate[dateKey]) ? data.byDate[dateKey] : null;
+            suksesList.push(entry ? (entry.sukses || 0) : 0);
+            gagalList.push(entry ? (entry.gagal || 0) : 0);
+          }
+        }
+        
+        const summaryEl = document.getElementById('monthlySummary');
+        if (summaryEl) {
+          summaryEl.innerHTML = `Total: <strong>${data.total || 0}</strong> post • <span style="color:#188038;font-weight:600">Sukses: ${data.sukses || 0}</span> • <span style="color:#d93025;font-weight:600">Gagal: ${data.gagal || 0}</span>`;
+        }
         
         const ctx = document.getElementById('monthlyChart').getContext('2d');
         if (monthlyChartInstance) monthlyChartInstance.destroy();
@@ -1403,15 +1434,113 @@
         monthlyChartInstance = new Chart(ctx, {
           type: 'line',
           data: {
-            labels: Object.keys(byWeek),
+            labels: labels,
             datasets: [
-              { label: 'Sukses', data: Object.values(byWeek).map(v => v.sukses), borderColor: '#34a853', backgroundColor: 'rgba(52,168,83,0.1)', fill: true, tension: 0.4 },
-              { label: 'Gagal', data: Object.values(byWeek).map(v => v.gagal), borderColor: '#ea4335', backgroundColor: 'rgba(234,67,53,0.1)', fill: true, tension: 0.4 }
+              { 
+                label: 'Sukses', 
+                data: suksesList, 
+                borderColor: '#34a853', 
+                backgroundColor: 'rgba(52,168,83,0.12)', 
+                borderWidth: 2.5,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#34a853',
+                fill: true, 
+                tension: 0.35,
+                spanGaps: false
+              },
+              { 
+                label: 'Gagal', 
+                data: gagalList, 
+                borderColor: '#ea4335', 
+                backgroundColor: 'rgba(234,67,53,0.08)', 
+                borderWidth: 2,
+                pointRadius: 2.5,
+                pointHoverRadius: 5,
+                pointBackgroundColor: '#ea4335',
+                fill: true, 
+                tension: 0.35,
+                spanGaps: false
+              }
             ]
           },
-          options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+              mode: 'index',
+              intersect: false
+            },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  title: function(items) {
+                    if (!items.length) return '';
+                    const dayNum = items[0].label;
+                    const dateObj = new Date(year, month, Number(dayNum));
+                    return dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                  },
+                  label: function(item) {
+                    return ` ${item.dataset.label}: ${item.raw !== null ? item.raw : 0} post`;
+                  },
+                  footer: function(items) {
+                    let total = 0;
+                    items.forEach(it => {
+                      if (it.raw !== null) total += Number(it.raw);
+                    });
+                    return 'Total: ' + total + ' postingan';
+                  }
+                }
+              },
+              legend: {
+                position: 'top',
+                labels: {
+                  boxWidth: 12,
+                  font: { size: 12, family: 'Inter, sans-serif' }
+                }
+              }
+            },
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: 'Tanggal (Hari)',
+                  font: { size: 11, weight: '500' },
+                  color: '#888'
+                },
+                grid: {
+                  display: false
+                },
+                ticks: {
+                  maxRotation: 0,
+                  autoSkip: true,
+                  maxTicksLimit: 16,
+                  font: { size: 11 }
+                }
+              },
+              y: {
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: 'Jumlah Post',
+                  font: { size: 11, weight: '500' },
+                  color: '#888'
+                },
+                ticks: {
+                  precision: 0,
+                  stepSize: 1,
+                  font: { size: 11 }
+                },
+                grid: {
+                  color: '#f0f0f0'
+                }
+              }
+            }
+          }
         });
-      } catch(e) {}
+      } catch(e) {
+        console.error('Error loadMonthlyStats:', e);
+      }
     }
 
     function changeMonth(dir) {
@@ -1421,6 +1550,7 @@
 
     function getMonthLabel(offset) {
       const d = new Date();
+      d.setDate(1);
       d.setMonth(d.getMonth() + offset);
       return offset === 0 ? 'Bulan Ini' : d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
     }
@@ -2694,14 +2824,15 @@
     }
 
     async function testPostFacebook() {
-      showToast('Mengirim test postingan ke Facebook...', 'success');
+      showToast('Mengirim test postingan foto ke Facebook...', 'success');
       try {
         const res = await apiPost('testFacebook', {});
         if (res.success) {
-          showToast('✅ Berhasil posting ke Facebook Page!', 'success');
+          showToast('✅ Berhasil posting foto ke Facebook Page!', 'success');
           if (res.url) window.open(res.url, '_blank');
         } else {
           showToast('❌ Gagal: ' + (res.error || 'Periksa Page ID & Token'), 'error');
+          alert('❌ Gagal posting ke Facebook:\n' + (res.error || 'Periksa Page ID & Token'));
         }
       } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
