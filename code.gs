@@ -1672,7 +1672,7 @@ function buatPostinganOtomatis() {
         if (String(config.POST_TO_FACEBOOK) === 'true' && config.FB_PAGE_ID && config.FB_PAGE_ACCESS_TOKEN && quotaStatus.canPostFb && quotaStatus.nextFbPageInfo) {
           try {
             const targetPageId = quotaStatus.nextFbPageInfo.pageId;
-            const fbCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info & Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Website & Katalog Resmi: ${resBlogger.url}` : '');
+            const fbCaption = formatSocialCaption(aiData.socialCaption, item, config, 'facebook', resBlogger.url);
             const resFb = postKeFacebook(fbCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '', targetPageId);
             if (resFb && resFb.success) {
               const pName = resFb.pageName ? `FB: ${resFb.pageName}` : `FB (${targetPageId})`;
@@ -1690,7 +1690,7 @@ function buatPostinganOtomatis() {
         if (String(config.POST_TO_INSTAGRAM) === 'true' && config.IG_ACCOUNT_ID && config.FB_PAGE_ACCESS_TOKEN && (socialImgUrl || heroThumb || heroLink) && quotaStatus.canPostIg && quotaStatus.nextIgInfo) {
           try {
             const targetIgId = quotaStatus.nextIgInfo.igId;
-            const igCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Order via WhatsApp: ${config.WHATSAPP_NUMBER}`;
+            const igCaption = formatSocialCaption(aiData.socialCaption, item, config, 'instagram', resBlogger.url);
             const resIg = postKeInstagram(igCaption, socialImgUrl || heroThumb || heroLink, targetIgId);
             if (resIg && resIg.success) {
               const igName = resIg.username ? `IG: @${resIg.username}` : `IG (${targetIgId})`;
@@ -1707,8 +1707,8 @@ function buatPostinganOtomatis() {
         // 4. Post ke Facebook Group (Smart Per-Group Rolling Engine)
         if (String(config.POST_TO_FB_GROUP) === 'true' && config.FB_GROUP_ID && config.FB_PAGE_ACCESS_TOKEN && quotaStatus.canPostFbGroup) {
           try {
-            const groupCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info / Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Website & Katalog Resmi: ${resBlogger.url}` : '');
             const targetGrpId = quotaStatus.nextGroupInfo ? quotaStatus.nextGroupInfo.groupId : '';
+            const groupCaption = formatSocialCaption(aiData.socialCaption, item, config, 'facebook_group', resBlogger.url);
             const resGroup = postKeFacebookGroup(groupCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '', targetGrpId);
             if (resGroup && resGroup.success) {
               const grpTag = resGroup.groupId ? `FB Group (${resGroup.groupId})` : 'FB Group';
@@ -1725,7 +1725,7 @@ function buatPostinganOtomatis() {
         // 5. Post ke Google Maps Bisnis (Google Business Profile)
         if (String(config.POST_TO_GMB) === 'true' && (config.GMB_WEBHOOK_URL || config.GMB_LOCATION_ID) && quotaStatus.canPostGmb) {
           try {
-            const gmbSummary = (aiData.socialCaption || finalTitle) + `\n\nInfo Pemesanan & Konsultasi:\n📲 WhatsApp: 0${cleanWa.replace(/^62/, '')}`;
+            const gmbSummary = formatSocialCaption(aiData.socialCaption, item, config, 'gmb', resBlogger.url);
             const gmbActionUrl = resBlogger.url || `https://wa.me/${cleanWa}`;
             const resGmb = postKeGoogleBisnis(gmbSummary, socialImgUrl || heroThumb || heroLink, gmbActionUrl, finalTitle);
             if (resGmb && resGmb.success) {
@@ -1844,11 +1844,12 @@ function postManual(produkNama, keyword, row) {
       
       const socialImgUrl = getSmartSocialPhoto(pData, { produkNama, keyword }, aiData);
 
+      const manualItem = { produkNama, keyword };
+
       // 2. Post ke Facebook (ISOLATED)
       if (String(config.POST_TO_FACEBOOK) === 'true' && config.FB_PAGE_ID && config.FB_PAGE_ACCESS_TOKEN) {
         try {
-          const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
-          const fbCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info & Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Website & Katalog Resmi: ${resBlogger.url}` : '');
+          const fbCaption = formatSocialCaption(aiData.socialCaption, manualItem, config, 'facebook', resBlogger.url);
           const resFb = postKeFacebook(fbCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '');
           if (resFb && resFb.success) {
             const pTag = resFb.pageName ? `FB: ${resFb.pageName}` : 'FB';
@@ -1860,7 +1861,7 @@ function postManual(produkNama, keyword, row) {
       // 3. Post ke Instagram (ISOLATED)
       if (String(config.POST_TO_INSTAGRAM) === 'true' && config.IG_ACCOUNT_ID && config.FB_PAGE_ACCESS_TOKEN && (socialImgUrl || heroThumb || heroLink)) {
         try {
-          const igCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Order via WhatsApp: ${config.WHATSAPP_NUMBER}`;
+          const igCaption = formatSocialCaption(aiData.socialCaption, manualItem, config, 'instagram', resBlogger.url);
           const resIg = postKeInstagram(igCaption, socialImgUrl || heroThumb || heroLink);
           if (resIg && resIg.success) {
             const igTag = resIg.username ? `IG: @${resIg.username}` : 'IG';
@@ -1872,8 +1873,7 @@ function postManual(produkNama, keyword, row) {
       // 4. Post ke Facebook Group (ISOLATED)
       if (String(config.POST_TO_FB_GROUP) === 'true' && config.FB_GROUP_ID && config.FB_PAGE_ACCESS_TOKEN) {
         try {
-          const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
-          const groupCaption = (aiData.socialCaption || finalTitle) + `\n\n📲 Info / Order WhatsApp: https://wa.me/${cleanWa}` + (resBlogger.url ? `\n🌐 Website & Katalog Resmi: ${resBlogger.url}` : '');
+          const groupCaption = formatSocialCaption(aiData.socialCaption, manualItem, config, 'facebook_group', resBlogger.url);
           const resGroup = postKeFacebookGroup(groupCaption, socialImgUrl || heroThumb || heroLink, resBlogger.url || '');
           if (resGroup && resGroup.success) {
             const grpTag = resGroup.groupId ? `FB Group (${resGroup.groupId})` : 'FB Group';
@@ -1885,9 +1885,8 @@ function postManual(produkNama, keyword, row) {
       // 5. Post ke Google Maps Bisnis (ISOLATED)
       if (String(config.POST_TO_GMB) === 'true' && (config.GMB_WEBHOOK_URL || config.GMB_LOCATION_ID)) {
         try {
-          const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
-          const gmbSummary = (aiData.socialCaption || finalTitle) + `\n\nInfo Pemesanan & Konsultasi:\n📲 WhatsApp: 0${cleanWa.replace(/^62/, '')}`;
-          const gmbActionUrl = resBlogger.url || `https://wa.me/${cleanWa}`;
+          const gmbSummary = formatSocialCaption(aiData.socialCaption, manualItem, config, 'gmb', resBlogger.url);
+          const gmbActionUrl = resBlogger.url || (cleanWa ? `https://wa.me/${cleanWa}` : '');
           const resGmb = postKeGoogleBisnis(gmbSummary, socialImgUrl || heroThumb || heroLink, gmbActionUrl, finalTitle);
           if (resGmb && resGmb.success) {
             channelLogs.push('Google Bisnis');
@@ -2105,7 +2104,265 @@ function getDriveImages(folderId) {
   }
 }
 
-// ==================== AI & HELPER ====================
+// ==================== AI & SOCIAL CAPTION GENERATOR ====================
+
+/**
+ * Database Kota-Kota Besar di Indonesia (Mencakup seluruh pulau utama)
+ */
+const KOTA_BESAR_INDONESIA = {
+  jabodetabek: ['Jakarta', 'Bogor', 'Depok', 'Tangerang', 'Bekasi', 'Tangerang Selatan'],
+  jawaBarat: ['Bandung', 'Cirebon', 'Cimahi', 'Sukabumi', 'Tasikmalaya', 'Karawang'],
+  jawaTengahDIY: ['Semarang', 'Solo (Surakarta)', 'Yogyakarta', 'Magelang', 'Purwokerto', 'Tegal', 'Pekalongan'],
+  jawaTimur: ['Surabaya', 'Malang', 'Sidoarjo', 'Gresik', 'Kediri', 'Jember', 'Madiun', 'Banyuwangi'],
+  baliNusa: ['Denpasar Bali', 'Badung', 'Gianyar', 'Mataram Lombok', 'Kupang'],
+  sumatera: ['Medan', 'Palembang', 'Pekanbaru', 'Batam', 'Padang', 'Bandar Lampung', 'Jambi'],
+  kalimantan: ['Balikpapan', 'Samarinda', 'Banjarmasin', 'Pontianak', 'Palangkaraya', 'IKN Nusantara'],
+  sulawesi: ['Makassar', 'Manado', 'Palu', 'Kendari', 'Gorontalo'],
+  malukuPapua: ['Ambon', 'Jayapura', 'Sorong', 'Timika']
+};
+
+/**
+ * Helper: Ambil kombinasi acak kota-kota besar Indonesia lintas pulau
+ */
+function getRandomIndonesianCities(min, max) {
+  min = min || 5;
+  max = max || 8;
+  const count = Math.floor(Math.random() * (max - min + 1)) + min;
+  const regions = Object.keys(KOTA_BESAR_INDONESIA);
+  const selected = [];
+  const shuffledRegions = regions.slice().sort(() => 0.5 - Math.random());
+  
+  for (const reg of shuffledRegions) {
+    const list = KOTA_BESAR_INDONESIA[reg];
+    const city = list[Math.floor(Math.random() * list.length)];
+    if (!selected.includes(city)) selected.push(city);
+    if (selected.length >= count) break;
+  }
+  
+  if (selected.length < count) {
+    const allCities = [].concat(...Object.values(KOTA_BESAR_INDONESIA));
+    while (selected.length < count) {
+      const c = allCities[Math.floor(Math.random() * allCities.length)];
+      if (!selected.includes(c)) selected.push(c);
+    }
+  }
+  return selected;
+}
+
+/**
+ * Helper: Standarisasi format nomor WhatsApp (Lokal & Internasional)
+ */
+function formatWaNumbers(raw) {
+  const digits = String(raw || '').replace(/[^0-9]/g, '');
+  let waLocal = digits;
+  if (waLocal.startsWith('62')) {
+    waLocal = '0' + waLocal.substring(2);
+  } else if (!waLocal.startsWith('0')) {
+    waLocal = '0' + waLocal;
+  }
+
+  let waIntl = digits;
+  if (waIntl.startsWith('0')) {
+    waIntl = '62' + waIntl.substring(1);
+  } else if (!waIntl.startsWith('62')) {
+    waIntl = '62' + waIntl;
+  }
+
+  return { waLocal, waIntl, waLink: `https://wa.me/${waIntl}` };
+}
+
+/**
+ * 16 Variasi Sudut Pandang (Hook Angles) Copywriting Medsos yang Berbeda Radikal
+ */
+const SOCIAL_HOOK_ANGLES = [
+  {
+    nama: 'Problem Solver (Solusi Masalah Nyata)',
+    style: 'Empatik & Solutif',
+    instruction: 'Awali langsung dengan masalah umum yang bikin frustrasi (lantai dingin, licin, nat keramik kotor, atau lantai kusam), lalu perkenalkan [kw] sebagai jawaban tuntas.'
+  },
+  {
+    nama: 'Rekomendasi Arsitek & Desainer Interior',
+    style: 'Profesional & Berkelas',
+    instruction: 'Buka dari perspektif arsitektur dan desainer interior modern yang kini memprioritaskan [kw] untuk estetika elegan dan ketahanan jangka panjang.'
+  },
+  {
+    nama: 'Transformasi Visual & Makeover Ruangan',
+    style: 'Antusias & Visual',
+    instruction: 'Buka dengan efek dramatis perubahan suasana ruangan sebelum vs sesudah dipasang [kw], membuat ruangan terasa lebih lega, hangat, dan estetik seketika.'
+  },
+  {
+    nama: 'Mitos vs Realita Renovasi',
+    style: 'To-the-point & Edukatif',
+    instruction: 'Patahkan anggapan renovasi mewah itu harus ribet dan kuras kantong. Tunjukkan bagaimana upgrade ruangan jadi hotel bintang lima bisa sangat efisien dengan [kw].'
+  },
+  {
+    nama: 'Uji Ketahanan & Daya Tahan Ekstrem',
+    style: 'Percaya Diri & Faktual',
+    instruction: 'Buka dengan keunggulan ketahanan luar biasa dari [kw] (100% tahan air, anti rayap, tahan cakar hewan, dan anti gores bertahun-tahun).'
+  },
+  {
+    nama: 'Kenyamanan Keluarga & Anak-Anak',
+    style: 'Hangat & Ramah Keluarga',
+    instruction: 'Angkat kenyamanan melangkah tanpa alas kaki, permukaan aman tidak licin, empuk, dan higienis untuk anak yang aktif bermain dengan [kw].'
+  },
+  {
+    nama: 'Suasana Cafe & Villa Mewah',
+    style: 'Lifestyle & Inspiratif',
+    instruction: 'Gunakan hook tentang menghadirkan suasana santai villa Bali atau coffee shop estetik langsung ke rumah Anda berkat sentuhan [kw].'
+  },
+  {
+    nama: 'Tips Pembeli Cerdas (Smart Buyer)',
+    style: 'Edukasi & Peduli',
+    instruction: 'Beri peringatan ramah agar tidak asal pilih material tiruan yang gampang melengkung, dan kenapa spesifikasi asli dari [kw] ini jauh lebih menguntungkan.'
+  },
+  {
+    nama: 'Tren Japandi & Scandinavian Minimalis',
+    style: 'Modern & Estetik',
+    instruction: 'Hubungkan dengan tren hunian kekinian (Japandi / Scandinavian) di mana tekstur dan tone warna alami dari [kw] menyatu manis dengan dekorasi rumah.'
+  },
+  {
+    nama: 'Praktis Cepat Pasang Tanpa Bongkar',
+    style: 'Solusi Cepat & Efisien',
+    instruction: 'Soroti kepraktisan pemasangan [kw] yang bisa langsung dipasang di atas lantai lama tanpa perlu bongkar keramik dan tanpa debu kotor berhari-hari.'
+  },
+  {
+    nama: 'Pilihan Ruang Usaha & Area Komersial',
+    style: 'B2B & Komersial',
+    instruction: 'Soroti kebutuhan kantor, butik, klinik, atau resto yang butuh lantai elegan berdaya tahan tinggi menghadapi ribuan langkah kaki per hari lewat [kw].'
+  },
+  {
+    nama: 'Inspirasi Sudut Favorit & Home Office',
+    style: 'Santai & Personal',
+    instruction: 'Buka dengan ide menata sudut kamar tidur atau ruang kerja di rumah agar terasa lebih nyaman, fokus, dan bikin betah seharian dengan [kw].'
+  },
+  {
+    nama: 'Detail Tekstur Serat Mewah',
+    style: 'Sensori & Deskriptif',
+    instruction: 'Gambarkan sensasi keindahan tekstur timbul alami [kw] yang saat disentuh dan dipijak benar-benar terasa otentik dan berkelas.'
+  },
+  {
+    nama: 'Pertanyaan Provokatif / Mindset Baru',
+    style: 'Menggugah Rasa Ingin Tahu',
+    instruction: 'Lontarkan pertanyaan yang membuka mata tentang kenapa masih bertahan dengan lantai konvensional yang kusam, padahal ada [kw] yang jauh lebih estetik.'
+  },
+  {
+    nama: 'Kesiapan Stok & Layanan Pengiriman Prima',
+    style: 'Sigap & Terpercaya',
+    instruction: 'Buka dengan komitmen tim kami yang siap kirim cepat dan pasang rapi [kw] dengan dukungan tim teknisi berpengalaman ke berbagai kota.'
+  },
+  {
+    nama: 'Peningkatan Nilai Properti (Asset Value)',
+    style: 'Visioner & Finansial',
+    instruction: 'Soroti bagaimana upgrade interior dengan [kw] secara instan mampu menaikkan impresi kemewahan dan nilai jual/sewa hunian Anda.'
+  }
+];
+
+/**
+ * Smart Social Caption Post-Processor:
+ * 1. Memastikan Kata Kunci Utama (kw) SELALU ada dan ditempatkan natural.
+ * 2. Memastikan Jangkauan Layanan Kota-Kota Besar di Indonesia tertera lengkap.
+ * 3. Menyesuaikan format khusus platform (Facebook link klikable, IG bio CTA & dots separator, GMB clean).
+ */
+function formatSocialCaption(rawCaption, item, config, platform, bloggerUrl) {
+  config = config || getConfig();
+  item = item || {};
+  platform = platform || 'facebook';
+  
+  const prodName = String(item.produkNama || 'Vinyl Flooring').trim();
+  const kw = String(item.keyword || prodName).trim();
+  const waInfo = formatWaNumbers(config.WHATSAPP_NUMBER);
+  const compName = config.COMPANY_NAME || 'CV Nafindo Group';
+  
+  const sampleCities = getRandomIndonesianCities(5, 7);
+  const cityCoverageLine = `🚚 Pengiriman & Layanan Pemasangan Meliputi:\n📍 ${sampleCities.join(', ')} dan seluruh kota lainnya di Indonesia.`;
+
+  let caption = (rawCaption && typeof rawCaption === 'string') ? rawCaption.trim() : '';
+
+  // 1. Fallback generator jika AI tidak menghasilkan respon
+  if (!caption) {
+    const angle = SOCIAL_HOOK_ANGLES[Math.floor(Math.random() * SOCIAL_HOOK_ANGLES.length)];
+    caption = `✨ Hadirkan suasana ruangan berkelas dengan ${kw} (${prodName}) persembahan resmi ${compName}!\n\n` +
+      `Kenapa ${kw} menjadi pilihan utama?\n` +
+      `✅ Material tahan air 100% & anti rayap\n` +
+      `✅ Permukaan bertekstur alami, aman tidak licin, dan empuk di kaki\n` +
+      `✅ Pemasangan cepat, rapi, dan bisa langsung di atas lantai lama\n` +
+      `✅ Perawatan praktis, tahan gores bertahun-tahun\n\n` +
+      `${cityCoverageLine}`;
+  } else {
+    // 2. Verifikasi Kata Kunci Utama (kw)
+    const lowerCap = caption.toLowerCase();
+    const lowerKw = kw.toLowerCase();
+    
+    if (!lowerCap.includes(lowerKw)) {
+      const firstLineBreak = caption.indexOf('\n');
+      if (firstLineBreak !== -1) {
+        const firstLine = caption.substring(0, firstLineBreak).trim();
+        const rest = caption.substring(firstLineBreak).trim();
+        caption = `${firstLine} — Solusi terbaik dengan ${kw}!\n\n${rest}`;
+      } else {
+        caption = `✨ Upgrade interior impian bersama ${kw} (${prodName}):\n\n${caption}`;
+      }
+    }
+
+    // 3. Verifikasi Lokasi Layanan Kota-Kota Besar
+    const hasCityMention = /kirim|layanan|wilayah|kota|pemasangan|pengiriman|jakarta|surabaya|bandung|semarang|medan|makassar|bali/i.test(caption);
+    if (!hasCityMention) {
+      const hashIndex = caption.indexOf('#');
+      if (hashIndex !== -1) {
+        const bodyText = caption.substring(0, hashIndex).trim();
+        const hashText = caption.substring(hashIndex).trim();
+        caption = `${bodyText}\n\n${cityCoverageLine}\n\n${hashText}`;
+      } else {
+        caption = `${caption}\n\n${cityCoverageLine}`;
+      }
+    }
+  }
+
+  // 4. Formatting Khusus Per Platform
+  if (platform === 'instagram') {
+    let igCta = `\n\n📲 Info Konsultasi, Survey & Order:\nWhatsApp: ${waInfo.waLocal} (Klik link di bio profil)`;
+    let igBody = caption;
+    let igHashtags = '';
+    
+    const hashMatch = caption.match(/#[a-zA-Z0-9_]+/g);
+    if (hashMatch && hashMatch.length > 0) {
+      const firstHashIdx = caption.indexOf('#');
+      igBody = caption.substring(0, firstHashIdx).trim();
+      igHashtags = hashMatch.join(' ');
+    }
+    
+    const cityTags = sampleCities.slice(0, 3).map(c => '#' + c.replace(/[^a-zA-Z0-9]/g, '')).join(' ');
+    const kwClean = kw.replace(/[^a-zA-Z0-9]/g, '');
+    const prodClean = prodName.replace(/[^a-zA-Z0-9]/g, '');
+    const extraTags = `#${kwClean} #${prodClean} #DesainInterior #RenovasiRumah #InteriorIndonesia ${cityTags}`;
+    
+    return `${igBody}${igCta}\n.\n.\n.\n${igHashtags} ${extraTags}`.trim();
+
+  } else if (platform === 'facebook' || platform === 'facebook_group') {
+    let fbCta = `\n\n📲 Info Pemesanan, Estimasi & Katalog:\n👉 WhatsApp: ${waInfo.waLink}`;
+    if (bloggerUrl) {
+      fbCta += `\n🌐 Website & Katalog Resmi: ${bloggerUrl}`;
+    }
+    
+    if (!caption.includes(waInfo.waLink)) {
+      const hashIndex = caption.indexOf('#');
+      if (hashIndex !== -1) {
+        const bodyText = caption.substring(0, hashIndex).trim();
+        const hashText = caption.substring(hashIndex).trim();
+        return `${bodyText}${fbCta}\n\n${hashText}`.trim();
+      } else {
+        return `${caption}${fbCta}`.trim();
+      }
+    }
+    return caption;
+
+  } else if (platform === 'gmb') {
+    let cleanText = caption.replace(/#[a-zA-Z0-9_]+/g, '').trim();
+    return `${cleanText}\n\nInfo Pemesanan & Konsultasi:\n📲 WhatsApp: ${waInfo.waLocal}`.trim();
+  }
+
+  return caption;
+}
 
 function getAIDescription(nama, kw, tipe, spec) {
   const config = getConfig();
@@ -2119,31 +2376,43 @@ function getAIDescription(nama, kw, tipe, spec) {
   const model = (config.GROQ_MODEL && config.GROQ_MODEL.toLowerCase() !== 'groq' && config.GROQ_MODEL.includes('/')) 
     ? config.GROQ_MODEL 
     : 'openai/gpt-oss-120b';
+
+  // Pilih 1 Sudut Pandang (Hook Angle) secara acak murni untuk mencegah teks pembuka monoton
+  const selectedAngle = SOCIAL_HOOK_ANGLES[Math.floor(Math.random() * SOCIAL_HOOK_ANGLES.length)];
+  // Pilih 5-7 Kota Besar di Indonesia secara acak lintas pulau
+  const sampleCities = getRandomIndonesianCities(5, 7);
+  const waInfo = formatWaNumbers(config.WHATSAPP_NUMBER);
   
-  const prompt = `Buat konten penawaran produk untuk Blog dan Sosial Media (Facebook & Instagram) dengan gaya bahasa yang NATURAL, LUWES, dan SEPERTI BUATAN MANUSIA. Hindari pola kalimat yang berulang atau monoton. Buat sudut pandang (angle) promosi yang berbeda-beda setiap kali merespons!
+  const prompt = `Buat konten penawaran produk untuk Blog dan Media Sosial (Facebook & Instagram) dengan gaya bahasa yang SANGAT NATURAL, LUWES, MENARIK, dan SEPERTI TULISAN ADMIN MANUSIA ASLI. Hindari formula kalimat klise atau pembuka yang monoton!
 
 PRODUK UTAMA: ${nama}
-KATA KUNCI/JUDUL: ${kw}
+KATA KUNCI UTAMA (WAJIB MASUK): ${kw}
 VARIASI TIPE: ${tipe}
 DATA SPESIFIKASI ASLI:
 ${spec || 'Hubungi admin untuk detail spesifikasi.'}
-NOMOR WHATSAPP: ${config.WHATSAPP_NUMBER}
-NAMA PERUSAHAAN: ${config.COMPANY_NAME || ''}
+NOMOR WHATSAPP: ${waInfo.waLocal}
+LINK WHATSAPP: ${waInfo.waLink}
+NAMA PERUSAHAAN: ${config.COMPANY_NAME || 'CV Nafindo Group'}
+
+PANDUAN SUDUT PANDANG (HOOK) SOSIAL MEDIA HARI INI:
+- Kategori Gaya: ${selectedAngle.nama} (${selectedAngle.style})
+- Petunjuk Hook Pembuka: ${selectedAngle.instruction}
 
 TUGAS:
 1. ARTIKEL BLOG:
-   - Judul SEO: Buat judul yang sangat natural dan bervariasi. Campurkan kata kunci, produk, nama kota acak di Indonesia, dan nomor ${config.WHATSAPP_NUMBER}. Jangan selalu menggunakan format pemisah "|".
-   - Deskripsi: 3-4 paragraf HTML persuasif & SEO-friendly. Gunakan gaya bahasa storytelling, problem-solving, atau edukasi. Hindari bahasa yang terlalu kaku atau "robotik". Fokus pada produk "${nama}" dan kata kunci "${kw}".
-   - Tabel: HTML spesifikasi, header #4285f4 teks putih. JANGAN mengarang data spesifikasi di luar data asli.
-2. CAPTION SOSIAL MEDIA (Facebook & Instagram) - SANGAT PENTING:
-   - JANGAN selalu memulai dengan "Halo", "Butuh...", atau sapaan standar. Gunakan Hook/Headline yang out-of-the-box (contoh: cerita singkat, fakta unik, pertanyaan menggelitik, atau soft-selling natural).
-   - Tulis seolah-olah kamu adalah admin manusia yang sedang update status atau ngobrol santai namun tetap mengarah ke penjualan.
-   - 3-4 poin keunggulan & manfaat produk (gunakan format poin-poin yang bervariasi).
-   - Call to Action (CTA) ke WhatsApp ${config.WHATSAPP_NUMBER} dengan kalimat ajakan yang tidak membosankan.
-   - 10-15 Hashtags (#) yang relevan & populer.
-   - Format Teks Bersih (Plain Text, TANPA tag HTML).
-3. VISUAL PROMPT (1 kalimat singkat bahasa Inggris untuk visual foto produk yang 100% relevan):
-   - Contoh: "modern interior room with clean minimalist ${nama} flooring, daylight, commercial architectural photography 8k"
+   - Judul SEO: Buat judul yang sangat natural, variatif, dan persuasif. Padukan kata kunci "${kw}", nama produk "${nama}", salah satu nama kota acak (${sampleCities[0]}), dan kontak ${waInfo.waLocal}.
+   - Deskripsi: 3-4 paragraf HTML persuasif & SEO-friendly. Gunakan gaya storytelling/problem-solving edukatif. Fokus pada produk "${nama}" dan kata kunci "${kw}".
+   - Tabel: HTML spesifikasi, header #4285f4 teks putih. JANGAN mengarang data di luar spesifikasi asli.
+2. CAPTION SOSIAL MEDIA (Facebook & Instagram) - SANGAT WAJIB & KRUSIAL:
+   - HOOK PEMBUKA (1-2 KALIMAT PERTAMA): WAJIB menggunakan sudut pandang "${selectedAngle.nama}" dan WAJIB MENYEBUTKAN KATA KUNCI UTAMA: "${kw}".
+   - DILARANG KERAS menggunakan kata klise seperti "Halo...", "Apakah Anda sedang mencari...", "Pernahkah Anda membayangkan...", "Dalam dunia interior...". Awali langsung dengan kalimat hook yang unik, cerdas, dan menggugah rasa ingin tahu!
+   - BADAN CAPTION: Tulis 2-3 poin keunggulan & manfaat produk dengan gaya santai tapi menjual (soft-selling / konsultatif).
+   - JANGKAUAN LAYANAN & PENGIRIMAN: Wajib sertakan 1 bagian yang menyebutkan layanan pengiriman dan jasa pasang ke kota-kota besar di Indonesia: ${sampleCities.join(', ')} dan seluruh kota di Indonesia.
+   - CALL TO ACTION (CTA): Ajak konsultasi atau survey gratis ke WhatsApp ${waInfo.waLocal} atau ${waInfo.waLink}.
+   - HASHTAGS: 10-15 hashtags relevan (#) termasuk #${kw.replace(/\s+/g, '')} dan hashtag kota terkait.
+   - Format: Teks Bersih (Plain Text, TANPA tag HTML).
+3. VISUAL PROMPT (1 kalimat singkat bahasa Inggris untuk visual render foto produk 100% relevan):
+   - Contoh: "luxurious modern minimalist living room showcasing aesthetic ${nama} ${kw}, architectural commercial photography 8k"
 
 OUTPUT JSON (HANYA JSON, TANPA MARKDOWN):
 {"title":"...","description":"...","table":"...","socialCaption":"...","visualPrompt":"..."}`;
@@ -2155,10 +2424,10 @@ OUTPUT JSON (HANYA JSON, TANPA MARKDOWN):
       payload: JSON.stringify({
         model: model,
         messages: [
-          { role: 'system', content: 'Kamu adalah Copywriter Senior (Manusia Asli) dari Indonesia yang ahli membuat konten jualan soft-selling & hard-selling dengan gaya bahasa yang sangat bervariasi, tidak kaku, dan natural. Wajib Return JSON valid.' },
+          { role: 'system', content: 'Kamu adalah Copywriter Senior Indonesia yang ahli membuat konten jualan media sosial yang bervariasi, dinamis, cerdas, tidak klise, dan selalu menyertakan kata kunci serta kota layanan. Wajib Return JSON valid.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.9, max_tokens: 2048,
+        temperature: 0.95, max_tokens: 2048,
         response_format: { type: 'json_object' }
       }),
       muteHttpExceptions: true
@@ -3163,7 +3432,9 @@ function testFacebookPost() {
   const config = getConfig();
   const nextEligible = getNextEligibleFbPage();
   const pageTag = nextEligible ? `[Target Halaman: ${nextEligible.pageId}]` : '';
-  const testMsg = `🚀 [TEST AUTOPOST + GAMBAR] Halo dari Nafindo Autoposting! ${pageTag}\n\nSistem integrasi Facebook Page & Upload Gambar berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
+  const sampleCities = getRandomIndonesianCities(5, 7);
+  const waInfo = formatWaNumbers(config.WHATSAPP_NUMBER);
+  const testMsg = `🚀 [UJI SISTEM POSTING FB] ${config.COMPANY_NAME || 'CV Nafindo Group'} ${pageTag}\n\nSistem autoposting Facebook Page & render gambar estetik aktif dan terhubung sempurna.\n\n🚚 Siap kirim & pasang ke: ${sampleCities.join(', ')} dan seluruh wilayah Indonesia.\n\n📲 Konsultasi & Order: ${waInfo.waLink}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
   
   // Gambar default arsitektur & interior estetik (Unsplash CDN - Cepat & 100% Stabil)
   let testImg = 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=1080&q=80';
@@ -3198,8 +3469,10 @@ function testInstagramPost() {
   const config = getConfig();
   const nextEligible = getNextEligibleIgAccount();
   const igTag = nextEligible ? `[Target IG: ${nextEligible.igId}]` : '';
+  const sampleCities = getRandomIndonesianCities(5, 7);
+  const waInfo = formatWaNumbers(config.WHATSAPP_NUMBER);
   const testImg = 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800';
-  const testCaption = `🚀 [TEST AUTOPOST] Halo Instagram! ${igTag}\n\nSistem integrasi Instagram Bisnis berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n#nafindo #testautopost`;
+  const testCaption = `🚀 [UJI SISTEM POSTING IG] ${config.COMPANY_NAME || 'CV Nafindo Group'} ${igTag}\n\nIntegrasi Instagram Bisnis & upload foto terhubung sukses.\n\n🚚 Melayani pengiriman & instalasi ke: ${sampleCities.join(', ')} & sekitarnya.\n\n📲 WhatsApp: ${waInfo.waLocal} (Klik link di bio profil)\n.\n.\n.\n#nafindo #interiorindonesia #desaininterior #${sampleCities[0].replace(/[^a-zA-Z0-9]/g, '')} #testautopost`;
   const res = postKeInstagram(testCaption, testImg);
   if (res && res.success) {
     const igName = res.username ? `IG: @${res.username}` : (res.igId ? `IG (${res.igId})` : 'IG');
@@ -3429,7 +3702,9 @@ function testFacebookGroupPost() {
   const config = getConfig();
   const nextGroup = getNextEligibleFbGroup();
   const grpInfo = nextGroup ? `[Target Grup: ${nextGroup.groupId}]` : '';
-  const testMsg = `🚀 [TEST AUTOPOST + GAMBAR] Halo Anggota Grup ${grpInfo}!\n\nSistem autoposting Facebook Group & Upload Gambar dari Nafindo berhasil terhubung dengan sukses.\n\n📲 WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
+  const sampleCities = getRandomIndonesianCities(5, 7);
+  const waInfo = formatWaNumbers(config.WHATSAPP_NUMBER);
+  const testMsg = `🚀 [UJI POSTING GROUP FB] Halo Rekan Grup ${grpInfo}!\n\nSistem autoposting Facebook Group & upload foto dari ${config.COMPANY_NAME || 'CV Nafindo Group'} berhasil terhubung aktif.\n\n🚚 Melayani pengiriman & instalasi ke: ${sampleCities.join(', ')} & sekitarnya.\n\n📲 Info Pemesanan & Konsultasi: ${waInfo.waLink}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
   
   let testImg = 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=1080&q=80';
   try {
@@ -3857,12 +4132,13 @@ function testGoogleBisnisPost(data) {
   if (data.token) config.GMB_ACCESS_TOKEN = data.token;
   if (data.actionType) config.GMB_ACTION_TYPE = data.actionType;
 
-  const testSummary = `🚀 [TEST AUTOPOSTING]\n${config.COMPANY_NAME || 'CV Nafindo Group'} - Distributor Vinyl Lantai Resmi.\n\nSistem integrasi Google Maps Bisnis berhasil terhubung dengan sukses!\n\n📲 Info WhatsApp: ${config.WHATSAPP_NUMBER}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
+  const sampleCities = getRandomIndonesianCities(5, 7);
+  const waInfo = formatWaNumbers(config.WHATSAPP_NUMBER);
+  const testSummary = `🚀 [UJI SISTEM GOOGLE BISNIS]\n${config.COMPANY_NAME || 'CV Nafindo Group'} - Distributor & Aplikator Lantai Interior Resmi.\n\nSistem integrasi Google Maps Bisnis berhasil terhubung aktif.\n\n🚚 Jangkauan Layanan Pengiriman & Pasang: ${sampleCities.join(', ')} dan seluruh kota lainnya di Indonesia.\n\n📲 Info & Konsultasi: ${waInfo.waLocal}\n🌐 Waktu: ${new Date().toLocaleString('id-ID')}`;
   const testImg = 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800';
-  const cleanWa = String(config.WHATSAPP_NUMBER || '').replace(/[^0-9]/g, '');
-  const res = postKeGoogleBisnis(testSummary, testImg, `https://wa.me/${cleanWa}`, 'Test Post Google Bisnis');
+  const res = postKeGoogleBisnis(testSummary, testImg, waInfo.waLink, 'Test Post Google Bisnis');
   if (res && res.success) {
-    addLog('Test Google Bisnis', 'Google Business Profile', 'Sukses [Google Bisnis]', res.url || `https://wa.me/${cleanWa}`, '');
+    addLog('Test Google Bisnis', 'Google Business Profile', 'Sukses [Google Bisnis]', res.url || waInfo.waLink, '');
   } else if (res && res.error) {
     addLog('Test Google Bisnis', 'Google Business Profile', 'Gagal [Google Bisnis]', '', res.error);
   }
